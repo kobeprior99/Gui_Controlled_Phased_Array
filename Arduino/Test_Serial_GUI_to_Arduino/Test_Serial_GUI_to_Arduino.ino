@@ -8,10 +8,11 @@ void setup() {
 }
 
 void loop() {
+
   if (Serial.available() > 0){
     //if there is data available at serial
     String msg = Serial.readString();
-    if (msg == 'Hi'){
+    if (msg.length() != 0){
       digitalWrite(LED_PIN, HIGH);
       delay(1000);
       digitalWrite(LED_PIN, LOW);
