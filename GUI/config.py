@@ -1,3 +1,3 @@
 #contains constants used throughout the program
-BAUDRATE = 9600 
+BAUDRATE = 115200 
 START_BYTE = 0xAA
