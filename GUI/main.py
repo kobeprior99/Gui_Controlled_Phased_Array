@@ -1,7 +1,21 @@
 import time, serial, struct, serial.tools.list_ports
 from nicegui import ui
 from config import *
-
+ui.add_head_html('''
+<style>
+    body {
+        background-color: #f5f5f5;
+    }
+    .card {
+        width: 25%;
+        cursor: pointer;
+        transition: opacity 0.2s;
+    }
+    .card:hover {
+        opacity: 0.7;
+    }
+</style>
+''')
 def send_phases(port: str, phases: list[int]):
     """
     Connects to Arduino over serial and sends a list of 16 phase values.
@@ -29,17 +43,19 @@ def send_phases(port: str, phases: list[int]):
 @ui.page('/')
 def main_page():
 #<TODO> Make these button images that describe what we will be doing for each and make thsoe images clickable
-    with ui.column():
+    images = [
+    ('/manual', 'Manual_Phase_Control.png'), 
+    ('/oam', 'OAM_Control.png'),
+    ('/hermite', 'Hermite_Control.png'),
+    ('/beam', 'Beam_Control.png')
+    ]
+    with ui.column().classes('w-full items-center'):
         ui.label('Antenna Array Control').classes('text-3xl font-bold mb-8')
-        ui.button('Manually Control Phase of each Element',
-                  on_click=lambda: ui.navigate.to('/manual')).classes('nav-button')
-        ui.button('Generate OAM',
-                  on_click=lambda: ui.navigate.to('/oam')).classes('nav-button')
-        ui.button('Generate Hermite Gaussian',
-                  on_click=lambda: ui.navigate.to('/hermite')).classes('nav-button')
-        ui.button('Beam Scanning (Receive Mode)',
-                  on_click=lambda: ui.navigate.to('/beam')).classes('nav-button')
-
+    with ui.row().classes('w-full justify-center items-center gap-4'):
+        for target, filename in images:
+            ui.image(f'media/{filename}')\
+                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                .on('click', lambda t=target: ui.navigate.to(t))
 
 # ---- SUBPAGES ----
 @ui.page('/manual')
@@ -58,8 +74,8 @@ def manual_page():
         # Instructions
         ui.label(
             'Enter the phase in degrees (0–360) for each element. '
+            'Select Arduino Port from drop down menu'
             'Unused elements should remain at 0.'
-            'Find the COM port of Arduino (Easliy found in arduino ide or device manager)'
         ).classes('text-base text-gray-600 text-center')
         # COM port
         com_input = ui.select(options = portsList, label = 'Select Arduino Port').style('width: 300px')
