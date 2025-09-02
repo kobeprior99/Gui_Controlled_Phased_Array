@@ -1,37 +1,24 @@
+import time, serial, struct, serial.tools.list_ports
 from nicegui import ui
-import serial
-import struct
 from config import *
 
-def send_array(ser, arr):
+def send_phases(port: str, phases: list[int]):
     """
-    Sends array over serial to arduino
+    Connects to Arduino over serial and sends a list of 16 phase values.
     Args:
-        ser(Serial):serial connection between computer and arduino
-        arr(list): 16 phases for each element
+        port (str): Serial port, e.g., 'COM3' or '/dev/cu.usbmodem21201'
+        phases (list[int]): List of 16 integers (0-360) for each element
     """
-    #send each value as 2 bytes (big-endian) 2-byte integer
-    for val in arr:       
-        ser.write(struct.pack('>H', v))#'>H' = big-endian unsigned short
-
-def connect_serial(port, data):
-    """
-    Connects to serial and sends data to arduino in byte format
-    Args:
-        port (string): the port to connect to the arduino
-        data (list): 16 phases in degrees
-    """ 
-    baudrate = 115200
-    try:
-        ser = serial.Serial(port, BAUDRATE, timeout=1)
-        ui.notify(f'Successfully connected to {port}')
-        #send data
-        send_array(ser, data) 
-        #close serial
-        ser.close() 
+    try: 
+        ser = serial.Serial(port, BAUDRATE)
+        time.sleep(3)#wait for Arduino to reset
+        
+        # Send each phase as 2 bytes (big-endian unsigned short)
+        ser.write("Hi".encode('utf-8'))        
+        ui.notify(f'Successfully sent phases to Arduino on {port}')
     except Exception as e:
-         ui.notify(f'Failed to connect: {e}', color='red')
-
+        ui.notify(f"failed to connect/send: {e}", color='red')
+        print(e) 
 
 # ---- LANDING PAGE ----
 @ui.page('/')
@@ -52,6 +39,8 @@ def main_page():
 # ---- SUBPAGES ----
 @ui.page('/manual')
 def manual_page():
+    ports = serial.tools.list_ports.comports()
+    portsList = {p.device:f'{p.device} - {p.description}'for p in ports} 
     # Back button in the top-left
     ui.button('⬅ Back', on_click=ui.navigate.back)
 
@@ -68,7 +57,7 @@ def manual_page():
             'Find the COM port of Arduino (Easliy found in arduino ide or device manager)'
         ).classes('text-base text-gray-600 text-center')
         # COM port
-        com_input = ui.input(label = 'Enter Arduino Port',placeholder = 'e.g. COM3 or /dev/cu.usbmodem21201').style('width: 300px')
+        com_input = ui.select(options = portsList, label = 'Select Arduino Port').style('width: 300px')
         # Sliders in two columns
         sliders = []
         with ui.column().classes('w-full items-center gap-6 mt-6'):
@@ -99,8 +88,7 @@ def manual_page():
         port = com_input.value
         print(f'values are {values}')
         #SEND values to arduino
-        connect_serial(port, values) 
-        ui.notify(f'values sent to Arduino: {values}')
+        send_phases(port, values)
 
 
 #<TODO> Describe visually that the last 3 options default settings for a specific array
