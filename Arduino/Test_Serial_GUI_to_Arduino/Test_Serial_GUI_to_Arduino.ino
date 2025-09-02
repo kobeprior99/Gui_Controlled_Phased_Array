@@ -4,18 +4,18 @@ const int LED_PIN = 7;
 
 void setup() {
   pinMode(LED_PIN, OUTPUT);
-  Serial.begin(9600);
+  Serial.begin(115200);
 }
 
-void loop() {
-
-  if (Serial.available() > 0){
-    //if there is data available at serial
-    String msg = Serial.readString();
-    if (msg.length() != 0){
-      digitalWrite(LED_PIN, HIGH);
-      delay(1000);
-      digitalWrite(LED_PIN, LOW);
+void loop(){
+  if (Serial.available() >= 2 * NUM_ELEMENTS){
+    for (int i=0; i < NUM_ELEMENTS; i++){
+      byte high = Serial.read();
+      byte low = Serial.read();
+      phases[i] = (high << 8)| low; //16 bits [high bits,lowbits]
     }
+  if (phases[0] == 26){
+    digitalWrite(LED_PIN, HIGH);
+  }
   }
 }

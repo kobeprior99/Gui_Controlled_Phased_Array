@@ -14,8 +14,12 @@ def send_phases(port: str, phases: list[int]):
         time.sleep(3)#wait for Arduino to reset
         
         # Send each phase as 2 bytes (big-endian unsigned short)
-        #test for now
-        ser.write("Hi".encode('utf-8'))        
+        packed = bytearray() 
+        for val in phases:
+            packed += val.to_bytes(2, byteorder='big') #b'x12/x34'
+        #debug
+        print(packed)
+        ser.write(packed)    
         ui.notify(f'Successfully sent phases to Arduino on {port}')
     except Exception as e:
         ui.notify(f"failed to connect/send: {e}", color='red')
