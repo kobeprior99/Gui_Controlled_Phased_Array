@@ -105,7 +105,8 @@ def manual_page():
             ui.button('Submit', on_click=lambda: submit(sliders)).classes('mt-6')
 
     def submit(sliders):
-        values = [s.value for s in sliders]
+        #ensure integer values
+        values = [int(s.value) for s in sliders]
         port = com_input.value
         print(f'values are {values}')
         #SEND values to arduino
