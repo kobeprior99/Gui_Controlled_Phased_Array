@@ -116,9 +116,15 @@ def manual_page():
 #<TODO> Describe visually that the last 3 options default settings for a specific array
 @ui.page('/oam')
 def oam_page():
-    ui.label('Generate OAM')
     ui.button('⬅ Back', on_click=ui.navigate.back)
+    # Main content centered horizontally
+    with ui.column().classes('w-full items-center  gap-6 mt-6'):
+        # Header
+        ui.label('Generate OAM') \
+            .classes('text-2xl font-bold text-center')
 
+        # Instructions
+        ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
 @ui.page('/hermite')
 def hermite_page():
     ui.label('Generate Hermite Gaussian')
