@@ -96,7 +96,6 @@ def manual_page():
                                     .props('dense underlined') \
                                     .classes('w-14 text-center text-sm align-middle')
 
-                                slider.bind_value(textbox)
                                 textbox.bind_value(slider)
 
                                 sliders.append(slider)
