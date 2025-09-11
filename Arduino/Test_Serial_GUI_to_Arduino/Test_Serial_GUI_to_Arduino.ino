@@ -1,20 +1,13 @@
 const int NUM_ELEMENTS = 16;
 const int NUM_BITS = 8;
-//uint16_t phases[NUM_ELEMENTS];
+uint16_t phase
 int digital_words[NUM_ELEMENTS];
-const int LED_PIN = 7;
+int port_addresses[NUM_ELEMENTS];
 
-//digital pins controlling chip select 3-8 demux
+const int LED_PIN = 7;
 
 const float PHASE_STEP = 1.40625;
 void setup() {
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(CS1, OUTPUT);
-  pinMode(CS2, OUTPUT);
-  pinMode(CS3, OUTPUT);
-  pinMode(CS4, OUTPUT);
-  pinMode(CS5, OUTPUT);
-  pinMode(CS6, OUTPUT);
   digitalWrite(LED_PIN, HIGH);
   Serial.begin(115200);
   //Serial Lines for Group 1 and Group 2
