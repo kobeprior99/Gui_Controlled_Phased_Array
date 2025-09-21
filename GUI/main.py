@@ -1,6 +1,7 @@
 import time, serial, struct, serial.tools.list_ports
 from nicegui import ui
 from config import *
+
 ui.add_head_html('''
 <style>
     body {
