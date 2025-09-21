@@ -1,8 +1,0 @@
-import serial, time
-ser = serial.Serial('/dev/cu.usbmodem21101', 115200
-time.sleep(2) #wait for arduino to reset
-# Byte array with 5 values (0-255)
-data = bytearray([10, 20, 30, 40, 50])
-ser.write(data)
-print(f'sent {list(data)}')
-ser.close()
