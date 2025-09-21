@@ -71,6 +71,7 @@ void loop(){
   if (Serial.available() >= 2 * NUM_ELEMENTS){
 
     for (uint8_t i=0; i < NUM_ELEMENTS; i++){
+
       //read high and low bytes
       byte high = Serial.read();
       byte low = Serial.read();
