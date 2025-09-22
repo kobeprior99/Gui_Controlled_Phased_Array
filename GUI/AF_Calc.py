@@ -48,7 +48,7 @@ def find_phase_shift(theta_0, phi_0, dx, dy):
 
     return beta_X, beta_Y
 
-def dispAF(dx, dy, beta_x, beta_y):
+def dispAF(dx, dy, beta_x, beta_y,disp):
     '''
     Plots the array factor for a default square array defined in config file 
     Notes
@@ -65,7 +65,8 @@ def dispAF(dx, dy, beta_x, beta_y):
         Progressive phase shift in x direction
     beta_Y: float 
         Progressive phase shift in y direction
-
+    disp: bool
+       True: show or False: save
     Returns
     -------
     none
@@ -100,7 +101,10 @@ def dispAF(dx, dy, beta_x, beta_y):
     ax.set_zlim(0, 1.01)
     ax.set_title('Array Factor')
     fig.colorbar(surf)
-    plt.show()
+    if not disp:
+        plt.savefig('media/AF.png', bbox_inches='tight')
+    else:
+        plt.show()
 
 def main():
     dx = float(input('enter the horizontal spacing dx in terms of wavelengths: '))
@@ -108,8 +112,11 @@ def main():
     desired_phi = float(input('enter the azimuthal steering direction (degrees): '))
     desired_theta = float(input('enter the elevation steering direction (degrees): '))
     beta_x, beta_y = find_phase_shift(desired_theta, desired_phi, dx, dy)
-    dispAF(dx, dy, beta_x, beta_y)
+    dispAF(dx, dy, beta_x, beta_y,disp=True)
 
+def runAF_Calc(dx,dy,theta,phi):
+    betaX,betaY = find_phase_shift(theta, phi, dx,dy) 
+    dispAF(dx,dy,betaX,betaY,disp=False)
 
 #run that shit
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 import time, serial, struct, serial.tools.list_ports
 from nicegui import ui
 from config import *
-
+from AF_Calc import *
 ui.add_head_html('''
 <style>
     body {
@@ -139,7 +139,49 @@ def beam_page():
         classes('w-64 h-24 text-xl')
         ui.button('Transmit Mode', on_click=lambda: ui.navigate.to('/transmit_mode')).\
         classes('w-64 h-24 text-xl')
-    
+     
+
+    @ui.page('/transmit_mode')
+    def transmit_mode():
+        image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
+
+        def Transmit(dx,dy,theta,phi):
+            '''
+            Transmit with the main beam direction as defined by the user
+            We should also have live elements where the user can move the rx antenna 
+            to show relative magnitudes at different angles
+            '''
+            #show the user what the expected beam pattern
+            runAF_Calc(dx,dy,theta,phi)
+            image_container.clear() #remove any existing images
+            with image_container:
+                ui.image('media/AF.png').style('width:45%;').force_reload()
+
+        # Back button in the top-left
+        ui.button('⬅ Back', on_click=ui.navigate.back)
+        with ui.column().classes('w-full'):
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.label('Please connect the phase shifting network\
+                with the following port order, then define your array parameters and steer angle')\
+                .classes('text-base text-gray-600 text-center')
+
+
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.image('media/Default_Array.png').style('width: 45%;')
+                ui.image('media/Default_Array2.png').style('width: 45%;')
+            
+
+            with ui.row().classes('w-full justify-center items-center'):
+                dx = ui.number(label = 'dx (λ)', value=0.5, min=0.1).style('width:20%')
+                dy = ui.number(label = 'dy (λ)', value=0.5, min=0.1).style('width:20%')
+                theta = ui.number(label = 'Theta (degrees)', value=0, min = 0, max=90).style('width:20%')
+                phi = ui.number(label = 'Phi (degrees)', value=0, min = 0, max = 360).style('width:20%')
+                 
+            with ui.row().classes('w-full justify-center items-center'):
+                submit_button = ui.button(
+                    'Transmit',
+                    on_click=lambda: Transmit(dx.value, dy.value,theta.value, phi.value)
+                )
 
     @ui.page('/receive_mode')
     def receive_mode():        
@@ -169,42 +211,7 @@ def beam_page():
                  of sight of the receiving array, then press start when you are ready to scan')\
                 .classes('text-base text-gray-600 text-center')
                 ui.button('Start', on_click=Scan_Beam)
-    @ui.page('/transmit_mode')
-
-    def transmit_mode():
-
-        def Transmit():
-            '''
-            Transmit with the main beam direction as defined by the user
-            We should also have live elements where the user can move the rx antenna 
-            to show relative magnitudes at different angles
-            '''
-            pass
-
-
-        # Back button in the top-left
-        ui.button('⬅ Back', on_click=ui.navigate.back)
-        with ui.column().classes('w-full'):
-            with ui.row().classes('w-full justify-center items-center'):
-                ui.label('Please connect the phase shifting network\
-                with the following port order, then define your array parameters and steer angle')\
-                .classes('text-base text-gray-600 text-center')
-
-
-            with ui.row().classes('w-full justify-center items-center'):
-                ui.image('media/Default_Array.png').style('width: 45%;')
-                ui.image('media/Default_Array2.png').style('width: 45%;')
-            
-
-            with ui.row().classes('w-full justify-center items-center'):
-                dx = ui.number(label = 'dx (λ)', value=0.5, min=0.1).style('width:20%')
-                dy = ui.number(label = 'dy (λ)', value=0.5, min=0.1).style('width:20%')
-                theta = ui.number(label = 'Theta (degrees)', value=0, min = 0, max=90).style('width:20%')
-                phi = ui.number(label = 'Phi (degrees)', value=0, min = 0, max = 360).style('width:20%')
-            with ui.row().classes('w-full justify-center items-center'):
-                submit_button = ui.button('Transmit', on_click=Transmit)
-
-
+    
 # ---- RUN APP ----
 ui.run(title="Phase Network Control Dashboard")
 
