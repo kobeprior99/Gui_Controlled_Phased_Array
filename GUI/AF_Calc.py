@@ -43,8 +43,8 @@ def find_phase_shift(theta_0, phi_0, dx, dy):
     # k = 2pi/lam, and dx/y are represented in terms of fractions of a wavelength 
     theta_0 = np.deg2rad(theta_0) 
     phi_0 = np.deg2rad(phi_0) 
-    beta_X = -2 * np.pi * dx * np.sin(theta_0)*np.cos(phi_0) 
-    beta_Y = -2 * np.pi * dy * np.sin(theta_0)*np.sin(phi_0)
+    beta_X = -2 * np.pi * dx * np.sin(theta_0) * np.cos(phi_0) 
+    beta_Y = -2 * np.pi * dy * np.sin(theta_0) * np.sin(phi_0)
 
     return beta_X, beta_Y
 
@@ -79,7 +79,7 @@ def dispAF(dx, dy, beta_x, beta_y):
     Nside = int(np.sqrt(NUM_ELEMENTS))
     Sxm = 0
     for m in range(Nside):
-        Sxm += np.exp(1j*m*(2*np.pi*dx*np.sin(THETA)*np.cos(PHI) + beta_x)) 
+        Sxm += np.exp(1j * m * (2*np.pi*dx*np.sin(THETA)*np.cos(PHI) + beta_x)) 
     
     Syn = 0 
     for n in range(Nside): 
@@ -99,9 +99,6 @@ def dispAF(dx, dy, beta_x, beta_y):
     ax.set_ylim(-1.01, 1.01)
     ax.set_zlim(0, 1.01)
     ax.set_title('Array Factor')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
     fig.colorbar(surf)
     plt.show()
 
@@ -111,7 +108,7 @@ def main():
     desired_phi = float(input('enter the azimuthal steering direction (degrees): '))
     desired_theta = float(input('enter the elevation steering direction (degrees): '))
     beta_x, beta_y = find_phase_shift(desired_theta, desired_phi, dx, dy)
-    dispAF(dx,dy,beta_x,beta_y)
+    dispAF(dx, dy, beta_x, beta_y)
 
 
 #run that shit

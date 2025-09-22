@@ -134,6 +134,75 @@ def hermite_page():
 def beam_page():
     ui.label('Beam Scanning (Receive Mode)')
     ui.button('⬅ Back', on_click=ui.navigate.back)
+    with ui.row().classes('w-full justify-center items-center'):
+        ui.button('Receive Mode', on_click=lambda: ui.navigate.to('/receive_mode')).\
+        classes('w-64 h-24 text-xl')
+        ui.button('Transmit Mode', on_click=lambda: ui.navigate.to('/transmit_mode')).\
+        classes('w-64 h-24 text-xl')
+    
+
+    @ui.page('/receive_mode')
+    def receive_mode():        
+        
+        def Scan_Beam():
+            '''
+            Scan through all combinations of theta and phi then report the direction
+            of arival as a magnitude plot with a peak in the best link direction 
+            '''
+            pass
+            
+
+
+        # Back button in the top-left
+        ui.button('⬅ Back', on_click=ui.navigate.back)
+        with ui.column().classes('w-full'):
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.label('Please connect the phase shifting network\
+                with the following port order')\
+                .classes('text-base text-gray-600 text-center')
+
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.image('media/Default_Array.png').style('width: 45%;')
+                ui.image('media/Default_Array2.png').style('width: 45%;')
+            with ui.row().classes('w-full justify-center items-center'): 
+                ui.label('Place the transmitting antenna somewhere within line\
+                 of sight of the receiving array, then press start when you are ready to scan')\
+                .classes('text-base text-gray-600 text-center')
+                ui.button('Start', on_click=Scan_Beam)
+    @ui.page('/transmit_mode')
+
+    def transmit_mode():
+
+        def Transmit():
+            '''
+            Transmit with the main beam direction as defined by the user
+            We should also have live elements where the user can move the rx antenna 
+            to show relative magnitudes at different angles
+            '''
+            pass
+
+
+        # Back button in the top-left
+        ui.button('⬅ Back', on_click=ui.navigate.back)
+        with ui.column().classes('w-full'):
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.label('Please connect the phase shifting network\
+                with the following port order, then define your array parameters and steer angle')\
+                .classes('text-base text-gray-600 text-center')
+
+
+            with ui.row().classes('w-full justify-center items-center'):
+                ui.image('media/Default_Array.png').style('width: 45%;')
+                ui.image('media/Default_Array2.png').style('width: 45%;')
+            
+
+            with ui.row().classes('w-full justify-center items-center'):
+                dx = ui.number(label = 'dx (λ)', value=0.5, min=0.1).style('width:20%')
+                dy = ui.number(label = 'dy (λ)', value=0.5, min=0.1).style('width:20%')
+                theta = ui.number(label = 'Theta (degrees)', value=0, min = 0, max=90).style('width:20%')
+                phi = ui.number(label = 'Phi (degrees)', value=0, min = 0, max = 360).style('width:20%')
+            with ui.row().classes('w-full justify-center items-center'):
+                submit_button = ui.button('Transmit', on_click=Transmit)
 
 
 # ---- RUN APP ----
