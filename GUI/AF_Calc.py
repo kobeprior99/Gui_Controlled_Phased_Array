@@ -117,7 +117,9 @@ def main():
 def runAF_Calc(dx,dy,theta,phi):
     betaX,betaY = find_phase_shift(theta, phi, dx,dy) 
     dispAF(dx,dy,betaX,betaY,disp=False)
-
+    #return betax and y to be used in actually shifting the array
+    return betaX, betaY
+    
 #run that shit
 if __name__ == '__main__':
     main()

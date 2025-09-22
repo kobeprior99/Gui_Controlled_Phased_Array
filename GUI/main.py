@@ -143,19 +143,10 @@ def beam_page():
 
     @ui.page('/transmit_mode')
     def transmit_mode():
-        image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
+        
+        ports = serial.tools.list_ports.comports()
+        portsList = {p.device:f'{p.device} - {p.description}'for p in ports}  
 
-        def Transmit(dx,dy,theta,phi):
-            '''
-            Transmit with the main beam direction as defined by the user
-            We should also have live elements where the user can move the rx antenna 
-            to show relative magnitudes at different angles
-            '''
-            #show the user what the expected beam pattern
-            runAF_Calc(dx,dy,theta,phi)
-            image_container.clear() #remove any existing images
-            with image_container:
-                ui.image('media/AF.png').style('width:45%;').force_reload()
 
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
@@ -167,9 +158,10 @@ def beam_page():
 
 
             with ui.row().classes('w-full justify-center items-center'):
-                ui.image('media/Default_Array.png').style('width: 45%;')
-                ui.image('media/Default_Array2.png').style('width: 45%;')
-            
+                ui.image('media/Default_Array.png').style('width: 35%;')
+                ui.image('media/Default_Array2.png').style('width: 35%;')
+                com_input = ui.select(options = portsList, label = 'Select Arduino Port').style('width: 300px')
+        
 
             with ui.row().classes('w-full justify-center items-center'):
                 dx = ui.number(label = 'dx (λ)', value=0.5, min=0.1).style('width:20%')
@@ -180,8 +172,45 @@ def beam_page():
             with ui.row().classes('w-full justify-center items-center'):
                 submit_button = ui.button(
                     'Transmit',
-                    on_click=lambda: Transmit(dx.value, dy.value,theta.value, phi.value)
+                    on_click=lambda: Transmit()
                 )
+            image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
+
+            def Transmit():
+                '''
+                Transmit with the main beam direction as defined by the user
+                We should also have live elements where the user can move the rx antenna 
+                to show relative magnitudes at different angles
+                '''
+                #show the user what the expected beam pattern
+                beta_x, beta_y = runAF_Calc(dx.value,dy.value,theta.value,phi.value)
+                
+                image_container.clear() #remove any existing images
+                with image_container:
+                    ui.image('media/AF.png').style('width:45%;').force_reload()
+
+                #TODO with beta_x and beta_y send the appropriate phases to the arduino
+                '''  
+                recall array elements are like
+                1 2 3 4
+                5 6 7 8
+                9 10 11 12
+                13 14 15 16
+                where x goes down the rows and y goes across the columns
+                ---->y
+                |
+                |
+                |
+                x
+                ''' 
+                phase_array = [None] * 16
+                for M in range(4):
+                    #iterate across a row with constant dx*M offset (0-3)
+                    for N in range(4):
+                        #iterate across columns with constant dy*N offset (0-3)
+                        #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
+                        phase_array[N + 4*M] = int((np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360)
+                send_phases(com_input.value, phase_array) 
 
     @ui.page('/receive_mode')
     def receive_mode():        
