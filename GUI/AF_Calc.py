@@ -41,7 +41,8 @@ def find_phase_shift(theta_0, phi_0, dx, dy):
     '''
     #used Balanis
     # k = 2pi/lam, and dx/y are represented in terms of fractions of a wavelength 
-     
+    theta_0 = np.deg2rad(theta_0) 
+    phi_0 = np.deg2rad(phi_0) 
     beta_X = -2 * np.pi * dx * np.sin(theta_0)*np.cos(phi_0) 
     beta_Y = -2 * np.pi * dy * np.sin(theta_0)*np.sin(phi_0)
 
@@ -93,8 +94,7 @@ def dispAF(dx, dy, beta_x, beta_y):
     Z = AF_mag_norm * np.cos(THETA)
     fig = plt.figure()
     ax = fig.add_subplot(111, projection = '3d')
-    surf = ax.plot_surface(X,Y,Z,cmap ='plasma', 
-    linewidth = 0, antialiased =False) 
+    surf = ax.plot_surface(X, Y, Z, cmap ='plasma')
     ax.set_xlim(-1.01, 1.01)
     ax.set_ylim(-1.01, 1.01)
     ax.set_zlim(0, 1.01)
