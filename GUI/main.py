@@ -2,6 +2,7 @@ import time, serial, struct, serial.tools.list_ports
 from nicegui import ui
 from config import *
 from AF_Calc import *
+
 ui.add_head_html('''
 <style>
     body {
@@ -17,6 +18,7 @@ ui.add_head_html('''
     }
 </style>
 ''')
+
 def send_phases(port: str, phases: list[int]):
     """
     Connects to Arduino over serial and sends a list of 16 phase values.
