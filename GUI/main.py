@@ -3,16 +3,43 @@ from nicegui import ui
 import numpy as np 
 from config import *
 from AF_Calc import *
-
+import json #for saving/loading calibration files
 #Phase offsets stored globally to be used across the program
 PHASE_OFFSETS =np.zeros(16,dtype=int)#default to 0 phase offset at each port 
+PHASE_CORRECTED = False #set phase corrected to false until phase offsets are applied
 def update_phase(index:int, value:int):
+    global PHASE_CORRECTED, PHASE_OFFSETS
     if value is None or value == '':
         return #ignore empty or None inputs
     try:
         PHASE_OFFSETS[index] = int(value) 
+        PHASE_CORRECTED = True #set flag to true 
+
     except ValueError:
         pass #ignore invalid inputs
+        
+def save_calibration(filename:str):
+    '''
+    Save the calibration as a json file to be used on later runs
+    '''
+    with open(f'{filename}.json', 'w') as f:
+        json.dump(PHASE_OFFSETS.tolist(), f)
+    ui.notify(f'Calibration saved successfully into calibration.json!')
+    
+def use_calibration_file(filename:str):
+    '''
+    apply the calibration data from a json file
+    '''
+    global PHASE_OFFSETS, PHASE_CORRECTED
+    try:
+        with open(f'{filename}.json', 'r') as f:
+            loaded_offsets = json.load(f)
+        PHASE_OFFSETS = np.array(loaded_offsets,dtype = int)
+        PHASE_CORRECTED = True
+        ui.notify(f'Calibration file: {filename}.json loaded and applied!')
+    except FileNotFoundError:
+        ui.notify(f"no calibration file: {filename}.json found")
+
 
 SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
 def set_com_port(port:str):
@@ -50,7 +77,11 @@ def send_phases(phases: np.ndarray):
 # ---- LANDING PAGE ----
 @ui.page('/')
 def main_page():
-#<TODO> Make these button images that describe what we will be doing for each and make thsoe images clickable
+    '''
+    Main Page: where the user starts
+    User can enter the arduino port at the very start
+    The calibrate button will be blinking until the user performs calibration.
+    ''' 
     #connect to arduino part one time at the main screen:
 
     ports = serial.tools.list_ports.comports()
@@ -81,17 +112,24 @@ def main_page():
         }
     </style>
     ''')
+
     with ui.column().classes('w-full items-center'):
         ui.label('Antenna Array Control').classes('text-3xl font-bold mb-8')
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in images:
             classes_style = 'w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200' 
-            if target == '/calibrate' and np.all(PHASE_OFFSETS == 0):
-                classes_style += ' flash'
-            ui.image(f'media/{filename}')\
-                .classes(classes_style) \
+            if target == '/calibrate':
+            #store a reference to the calibrate image
+                calibrate_image = ui.image(f'media/{filename}')\
+                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200')\
                 .on('click', lambda t=target: navigate_if_ready(t))
-
+            else:
+                ui.image(f'media/{filename}')\
+                    .classes(classes_style) \
+                    .on('click', lambda t=target: navigate_if_ready(t))
+    if PHASE_CORRECTED == False:
+        calibrate_image.classes(add='flash')
+    
     def navigate_if_ready(target):
         """Navigate only if a valid com is selected"""
         if SELECTED_COM_PORT == 'SELECT ARDUINO PORT':
@@ -190,7 +228,7 @@ def hermite_page():
         Args: 
             mode (str) - requested hermite mode
         ''' 
-        if t == '01':
+        if mode == '01':
             '''
             mode 01 
             top 8 elements 0 degrees
@@ -199,7 +237,7 @@ def hermite_page():
             phases = np.array(
                 [0,0,0,0,0,0,0,0,180,180,180,180,180,180,180,180
             ])
-        elif t == '10':
+        elif mode == '10':
             '''
             mode 10
             left 8 elements 0 degrees
@@ -238,6 +276,9 @@ def beam_page():
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
+            # Header
+            ui.label('Receive mode') \
+                .classes('text-2xl font-bold text-center')
             with ui.row().classes('w-full justify-center items-center'):
                 ui.label('Please connect the phase shifting network\
                 with the following port order, then define your array parameters and steer angle')\
@@ -300,7 +341,6 @@ def beam_page():
 
     @ui.page('/receive_mode')
     def receive_mode():        
-        
         def Scan_Beam():
             '''
             Scan through all combinations of theta and phi then report the direction
@@ -313,6 +353,9 @@ def beam_page():
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
+            # Header
+            ui.label('Receive mode') \
+                .classes('text-2xl font-bold text-center')
             with ui.row().classes('w-full justify-center items-center'):
                 ui.label('Please connect the phase shifting network\
                 with the following port order')\
@@ -339,8 +382,35 @@ def calibrate():
         with ui.row().classes('w-full justify-center items-center'):
             ui.label('The phase of each shifter is set to 0 degrees.').classes('text-base text-gray-600 text-center')
             ui.label('Please connect the phase shifting network with a vector network analyzer Port 1 -> RFin and Port 2 -> 1 of the 16 output ports.').classes('text-base text-gray-600 text-center')
-            ui.label('From S21 input the phase in degrees (as an integer) seen at each port').classes('text-base text-gray-600 text-center')
-             
+            ui.label('from s21 input the phase in degrees (as an integer) seen at each port').classes('text-base text-gray-600 text-center')
+            
+    def prompt_save_calibration():
+        with ui.dialog() as dialog, ui.card():
+            ui.label('Enter filename to save calibration (".json" will be added automatically):')
+            filename_input = ui.input(label='Filename')
+            with ui.row():
+                ui.button('Cancel', on_click=dialog.close)
+                ui.button('Save', on_click=lambda: (
+                    save_calibration(filename_input.value.strip()),
+                    dialog.close()
+                ))
+        dialog.open()
+
+    def prompt_use_calibration():
+        with ui.dialog() as dialog, ui.card():
+            ui.label('Enter calibration filename (without ".json" if you prefer):')
+            filename_input = ui.input(label='Filename')
+            with ui.row():
+                ui.button('Cancel', on_click=dialog.close)
+                ui.button('Load', on_click=lambda: (
+                    use_calibration_file(filename_input.value.strip()),
+                    dialog.close()
+                ))
+        dialog.open()
+
+    with ui.row().classes('justify-center gap-4 my-2'):
+        ui.button('Save Calibration', on_click=prompt_save_calibration)
+        ui.button('Use Last Saved Calibration File', on_click=prompt_use_calibration)
     # Display inputs in a 4x4 grid
     with ui.grid(columns=4).classes("gap-4"):
         for i in range(16):
@@ -349,6 +419,8 @@ def calibrate():
                 value=PHASE_OFFSETS[i],
                 on_change=lambda e, i=i: update_phase(i, e.value),
             ).props("outlined dense step=0.1").style("width:100px;")
-           # ---- RUN APP ----
+
+
+# ---- RUN APP ---
 ui.run(title="Phase Network Control Dashboard",reload=False)
 #set reload=TRUE only during development, for deployment set false
