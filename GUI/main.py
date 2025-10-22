@@ -7,6 +7,8 @@ import json #for saving/loading calibration files
 #Phase offsets stored globally to be used across the program
 PHASE_OFFSETS =np.zeros(16,dtype=int)#default to 0 phase offset at each port 
 PHASE_CORRECTED = False #set phase corrected to false until phase offsets are applied
+phase_inputs = [] #store references to number boxes
+
 def update_phase(index:int, value:int):
     global PHASE_CORRECTED, PHASE_OFFSETS
     if value is None or value == '':
@@ -17,15 +19,19 @@ def update_phase(index:int, value:int):
 
     except ValueError:
         pass #ignore invalid inputs
-        
+def update_phase_inputs():
+    '''Referesh displayed UI numbers when phase_offsets changes.'''
+    for i, input_field in enumerate(phase_inputs):
+        input_field.value = int(PHASE_OFFSETS[i])
+
 def save_calibration(filename:str):
     '''
     Save the calibration as a json file to be used on later runs
     '''
     with open(f'{filename}.json', 'w') as f:
         json.dump(PHASE_OFFSETS.tolist(), f)
-    ui.notify(f'Calibration saved successfully into calibration.json!')
-    
+    ui.notify(f'Calibration saved successfully into {filename}.json!')
+
 def use_calibration_file(filename:str):
     '''
     apply the calibration data from a json file
@@ -36,6 +42,7 @@ def use_calibration_file(filename:str):
             loaded_offsets = json.load(f)
         PHASE_OFFSETS = np.array(loaded_offsets,dtype = int)
         PHASE_CORRECTED = True
+        update_phase_inputs() #refresh ui
         ui.notify(f'Calibration file: {filename}.json loaded and applied!')
     except FileNotFoundError:
         ui.notify(f"no calibration file: {filename}.json found")
@@ -371,6 +378,7 @@ def beam_page():
                 ui.button('Start', on_click=Scan_Beam)
 @ui.page('/calibrate')
 def calibrate():
+    global phase_inputs
     #implement calibration page
     ui.button('⬅ Back', on_click=ui.navigate.back)
     #start by sending 0 phase to each port 
@@ -410,15 +418,16 @@ def calibrate():
 
     with ui.row().classes('justify-center gap-4 my-2'):
         ui.button('Save Calibration', on_click=prompt_save_calibration)
-        ui.button('Use Last Saved Calibration File', on_click=prompt_use_calibration)
+        ui.button('Load Calibration', on_click=prompt_use_calibration)
     # Display inputs in a 4x4 grid
     with ui.grid(columns=4).classes("gap-4"):
         for i in range(16):
-            ui.number(
+            num = ui.number(
                 label=f"Phase {i+1}",
                 value=PHASE_OFFSETS[i],
                 on_change=lambda e, i=i: update_phase(i, e.value),
             ).props("outlined dense step=0.1").style("width:100px;")
+            phase_inputs.append(num)
 
 
 # ---- RUN APP ---
