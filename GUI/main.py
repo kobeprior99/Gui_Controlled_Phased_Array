@@ -1,13 +1,38 @@
-import time, serial, struct, serial.tools.list_ports
+"""
+===============================================================================
+ Title:        main.py
+ Author:       Kobe Prior
+ Description:  Main control interface for a low-cost 16-element phase shifter.
+               
+               This program provides a graphical user interface (GUI) built 
+               with NiceGUI for controlling, calibrating, and testing a 
+               4x4 antenna array driven by an Arduino-based phase shifter 
+               network. Users can:
+                 - Manually set phase values for each element
+                 - Load and save calibration data
+                 - Generate predefined phase profiles for OAM and Hermite modes
+                 - Perform beam steering and visualization
+                    -Receive Mode (DOA approx)
+                    -Transmit Mode (Qualitative gain pattern)
+               
+               The system communicates with the Arduino over a serial interface,
+               sending phase commands as packed bytes. Designed for educational 
+               and research applications in phased array beamforming.
+===============================================================================
+"""
+#import all necessary libraries
+import time, serial, struct, serial.tools.list_ports,json
 from nicegui import ui
 import numpy as np 
 from config import *
 from AF_Calc import *
-import json #for saving/loading calibration files
+
 #Phase offsets stored globally to be used across the program
-PHASE_OFFSETS =np.zeros(16,dtype=int)#default to 0 phase offset at each port 
-PHASE_CORRECTED = False #set phase corrected to false until phase offsets are applied
-phase_inputs = [] #store references to number boxes
+PHASE_OFFSETS =np.zeros(16,dtype=int)
+#flag to tell the user to calibrate if they haven't already
+PHASE_CORRECTED = False 
+#store reference to phase_input number boxes
+phase_inputs = [] 
 
 def update_phase(index:int, value:int):
     global PHASE_CORRECTED, PHASE_OFFSETS
@@ -81,6 +106,9 @@ def send_phases(phases: np.ndarray):
         ui.notify(f"failed to connect/send: {e}", color='red')
         print(e) 
 
+
+
+
 # ---- LANDING PAGE ----
 @ui.page('/')
 def main_page():
@@ -143,7 +171,16 @@ def main_page():
             ui.notify("Please Select Arduino Port before proceeding.",color = 'red')
             return
         ui.navigate.to(target)
+
+#---- END MAIN PAGE ----
+
+
+
+
 # ---- SUBPAGES ----
+
+
+# ---- manual phase shift page ----
 @ui.page('/manual')
 def manual_page():
     # Back button in the top-left
@@ -193,18 +230,65 @@ def manual_page():
         send_phases(values)
 
 
-#<TODO> Describe visually that the last 3 options default settings for a specific array
+#---- END Manual PAGE ----
+
+
+#----OAM PAGE ----
 @ui.page('/oam')
 def oam_page():
     ui.button('⬅ Back', on_click = ui.navigate.back)
     # Main content centered horizontally
     with ui.column().classes('w-full items-center  gap-6 mt-6'):
         # Header
-        ui.label('Generate OAM') \
+        ui.label('Generate OAM Beams') \
             .classes('text-2xl font-bold text-center')
 
         # Instructions
         ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
+        with ui.row().classes('w-full justify-center items-center'):
+            ui.image('media/Default_Array_OAM.png').style('width: 35%;')
+        ui.label('Create a Psuedo Circular Array by only driving elements highlighted') 
+    
+    images = [
+    ('-2', 'oam-2.png'), 
+    ('-1', 'oam-1.png'),
+    ('1', 'oam1.png'),
+    ('2', 'oam2.png')
+    ]
+    with ui.row().classes('w-full justify-center items-center gap-4'):
+        for target, filename in images:
+            ui.image(f'media/{filename}')\
+                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                .on('click', lambda t=target: oam_mode(t))
+        def oam_mode(mode: str):
+            '''
+            sends appropriate phases to generate oam beam
+            Args: 
+                mode(str): e.g. '-1' or '2'
+            '''
+            #default oam_1
+            phases = np.array([
+                0, 90, 45, 0, 135, 0, 0, 0, 180, 0, 0, 315, 0, 225, 270, 0
+            ]) 
+            if mode == '-2':
+                #Mode =-2 
+                phases *= -2
+            elif mode == '-1':
+                #Mode = -1
+                phases = phase_default * -1
+            elif mode == '1':
+                phases *= 1
+            else:
+                #Mode = 2
+                phases *= 2
+
+            #send the appropriate phase
+            send_phases(phases)
+
+#----END OAM MODE ----
+
+
+#----HERMITE PAGE-----
 @ui.page('/hermite')
 def hermite_page():
     ui.button('⬅ Back', on_click=ui.navigate.back)
@@ -265,7 +349,14 @@ def hermite_page():
                 0,0,180,180,0,0,180,180,180,180,0,0,180,180,0,0
             ]) 
         send_phases(phases)
-    
+   
+#---- END Hermite ----
+
+
+
+
+#----Beam Steering----
+
 @ui.page('/beam')
 def beam_page():
     ui.label('Beam Scanning (Receive Mode)')
@@ -275,8 +366,10 @@ def beam_page():
         classes('w-64 h-24 text-xl')
         ui.button('Transmit Mode', on_click=lambda: ui.navigate.to('/transmit_mode')).\
         classes('w-64 h-24 text-xl')
-     
+    
+    #Sub Pages----]=========-    
 
+    #----Transmit Mode ----
     @ui.page('/transmit_mode')
     def transmit_mode():
         
@@ -345,6 +438,10 @@ def beam_page():
                         #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
                         phase_array[N + 4*M] = int((np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360)
                 send_phases(phase_array) 
+    #----END transmit page----
+
+
+    #----Receive Mode page----
 
     @ui.page('/receive_mode')
     def receive_mode():        
@@ -355,8 +452,6 @@ def beam_page():
             '''
             pass
             
-
-
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
@@ -376,6 +471,17 @@ def beam_page():
                  of sight of the receiving array, then press start when you are ready to scan')\
                 .classes('text-base text-gray-600 text-center')
                 ui.button('Start', on_click=Scan_Beam)
+        
+
+        #----Receive Mode page----
+
+
+
+#----END BEAM Steering PAGE ----
+
+
+#----Calibration Page----
+
 @ui.page('/calibrate')
 def calibrate():
     global phase_inputs
@@ -419,6 +525,8 @@ def calibrate():
     with ui.row().classes('justify-center gap-4 my-2'):
         ui.button('Save Calibration', on_click=prompt_save_calibration)
         ui.button('Load Calibration', on_click=prompt_use_calibration)
+    #clear so we don't get more than 16 in phase_inputs
+    phase_inputs.clear()
     # Display inputs in a 4x4 grid
     with ui.grid(columns=4).classes("gap-4"):
         for i in range(16):
@@ -429,6 +537,7 @@ def calibrate():
             ).props("outlined dense step=0.1").style("width:100px;")
             phase_inputs.append(num)
 
+#----END Calibration Page
 
 # ---- RUN APP ---
 ui.run(title="Phase Network Control Dashboard",reload=False)
