@@ -79,6 +79,7 @@ def set_com_port(port:str):
     SELECTED_COM_PORT = port
     print(f'COM port set to {SELECTED_COM_PORT}')
 
+# <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
     """
     Connects to Arduino over serial and sends a list of 16 phase values.
@@ -247,19 +248,24 @@ def oam_page():
         ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
         with ui.row().classes('w-full justify-center items-center'):
             ui.image('media/Default_Array_OAM.png').style('width: 35%;')
-        ui.label('Create a Psuedo Circular Array by only driving elements highlighted') 
+        ui.label('Create a Psuedo Circular Array by only attaching the highlighted elements').classes('text-base text-gray-600 text-center')
+
     
     images = [
+    ('-3', 'oam-3.png'),
     ('-2', 'oam-2.png'), 
     ('-1', 'oam-1.png'),
     ('1', 'oam1.png'),
-    ('2', 'oam2.png')
+    ('2', 'oam2.png'),
+    ('3', 'oam3.png')
     ]
+
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in images:
             ui.image(f'media/{filename}')\
                 .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
                 .on('click', lambda t=target: oam_mode(t))
+
         def oam_mode(mode: str):
             '''
             sends appropriate phases to generate oam beam
@@ -270,17 +276,28 @@ def oam_page():
             phases = np.array([
                 0, 90, 45, 0, 135, 0, 0, 0, 180, 0, 0, 315, 0, 225, 270, 0
             ]) 
+            if mode == '-3':
+                phases *= -3
+
             if mode == '-2':
                 #Mode =-2 
                 phases *= -2
+
             elif mode == '-1':
                 #Mode = -1
-                phases = phase_default * -1
+                phases *= -1
+
             elif mode == '1':
+                #OAM mode 1
                 phases *= 1
-            else:
-                #Mode = 2
+                
+            elif mode =='2':
+                # Mode 2 
                 phases *= 2
+
+            else:
+                #Mode = 3
+                phases *= 3
 
             #send the appropriate phase
             send_phases(phases)
@@ -416,7 +433,6 @@ def beam_page():
                 with image_container:
                     ui.image('media/AF.png').style('width:45%;').force_reload()
 
-                #TODO with beta_x and beta_y send the appropriate phases to the arduino
                 '''  
                 recall array elements are like
                 1 2 3 4
@@ -496,7 +512,7 @@ def calibrate():
         with ui.row().classes('w-full justify-center items-center'):
             ui.label('The phase of each shifter is set to 0 degrees.').classes('text-base text-gray-600 text-center')
             ui.label('Please connect the phase shifting network with a vector network analyzer Port 1 -> RFin and Port 2 -> 1 of the 16 output ports.').classes('text-base text-gray-600 text-center')
-            ui.label('from s21 input the phase in degrees (as an integer) seen at each port').classes('text-base text-gray-600 text-center')
+            ui.label('Enter the phase (in degrees) from the S21 measurement for each port.').classes('text-base text-gray-600 text-center')
             
     def prompt_save_calibration():
         with ui.dialog() as dialog, ui.card():
