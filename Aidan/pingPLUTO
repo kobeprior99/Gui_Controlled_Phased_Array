@@ -1,0 +1,30 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import adi
+
+# Connect to PlutoSDR
+sdr = adi.Pluto("ip:192.168.2.1")
+sdr.sample_rate = int(1e6)
+
+# Receive one buffer of complex samples
+data = sdr.rx()
+
+sdr.rx_lo = int(2.1e9)     # tune the RX LO to 2.1 GHz
+sdr.sample_rate = int(1e6)
+
+
+# --- Figure(1): Time-domain I/Q plot ---
+plt.figure(1)
+plt.plot(np.real(data), label="I")
+plt.plot(np.imag(data), label="Q")
+plt.legend()
+plt.title("PlutoSDR IQ Samples (Time Domain)")
+plt.xlabel("Sample index")
+plt.ylabel("Amplitude")
+
+# --- Figure(2): Frequency-domain (spectrum) plot ---
+plt.figure(2)
+plt.psd(data, NFFT=1024, Fs=sdr.sample_rate/1e6)
+plt.title("Received Spectrum (MHz)")
+
+plt.show()
