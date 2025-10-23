@@ -19,8 +19,7 @@
 const float PHASE_STEP = 1.40625;
 
 // ------------Variables------------------
-uint16_t phase;
-uint8_t digital_word;
+uint8_t phase;
 bool phaseOPT = 0;
 uint8_t addr;
 uint16_t control_word;
@@ -40,22 +39,19 @@ void setup() {
 
 // -------------Main Loop------------------
 void loop() {
-  if (Serial.available() >= 2 * NUM_ELEMENTS) {
+  if (Serial.available() >= NUM_ELEMENTS) {
     for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
-      byte high = Serial.read();
-      byte low = Serial.read();
-      phase = (high << 8) | low;
-
+      phase = Serial.read();
+      //the opt bit mirrors the 90 degree bit
       phaseOPT = (phase >> 7) & 0x1;
       addr = (i & 0xF);
-      digital_word = (uint8_t)(round((phase / PHASE_STEP)) & 0xFF);
-
       control_word = (addr << 9) | (phaseOPT << 8) | phase;
-
       sendControlWord(control_word);
     }
   }
 }
+
+
 static inline void short_nop_delay_5(){
   asm volatile (
     "nop\n\t"

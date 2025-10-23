@@ -79,29 +79,34 @@ def set_com_port(port:str):
     SELECTED_COM_PORT = port
     print(f'COM port set to {SELECTED_COM_PORT}')
 
+
+def degrees_to_8bit(value: float)-> int:
+    '''
+    Convert a phase in degrees to an 8 bit hardware value (0-255),
+    snapping to the nearest step.
+    '''
+    #8 bit step size
+    step = 360 / 256
+    #divide by step, round to nearest integer wrap 0-256
+    return int(round(value/step)) % 256
 # <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
     """
     Connects to Arduino over serial and sends a list of 16 phase values.
     Phases are wrapped to 0-360 to ensure unsigned 2-byte transmission
     Args:
-        phases (numpy array): List of 16 integers (0-360) for each element
+        phases (numpy array): List of 16 floats (0-360) for each element
     """
     # first apply phase offsets 
     #since it's a numpy array element wise subtraction
-    phases_to_send = (phases - PHASE_OFFSETS) % 360
-    
+    phases_to_send = (phases - PHASE_OFFSETS) % 360 
+    hardware_phases = np.array([degrees_to_8bit(p) for p in phases_to_send], dtype= np.uint8)
     try: 
         ser = serial.Serial(SELECTED_COM_PORT, BAUDRATE)
         time.sleep(3)#wait for Arduino to reset
-        
-        # Send each phase as 2 bytes (big-endian unsigned short)
-        packed = bytearray() 
-        for val in phases_to_send:
-            packed += int(val).to_bytes(2, byteorder='big',signed = False) #b'x12/x34'
-        #debug
-        print(packed)
-        ser.write(packed)    
+        #send as raw bytes (1 byte per element)
+        ser.write(hardware_phases.tobytes()) 
+        print(f'sent: {hardware_phases}')
         ui.notify(f'Successfully sent phases to Arduino on {SELECTED_COM_PORT}')
     except Exception as e:
         ui.notify(f"failed to connect/send: {e}", color='red')
@@ -210,9 +215,9 @@ def manual_page():
                             with ui.row().classes('items-center gap-4'):
                                 ui.label(f'Element {element_index + 1}').classes('w-28')
 
-                                slider = ui.slider(min=0, max=360, value=0, step=1).classes('w-64')
+                                slider = ui.slider(min=0, max=360, value=0, step=(360/256)).classes('w-64')
 
-                                textbox = ui.number(min=0, max=360, value=0) \
+                                textbox = ui.number(min=0, max=360, value=0, step=(360/256))\
                                     .props('dense underlined') \
                                     .classes('w-14 text-center text-sm align-middle')
 
@@ -225,7 +230,7 @@ def manual_page():
 
     def submit(sliders):
         #ensure integer values
-        values = np.array([int(s.value) for s in sliders])
+        values = np.array([s.value for s in sliders])
         print(f'values are {values}')
         #SEND values to arduino
         send_phases(values)
@@ -446,13 +451,13 @@ def beam_page():
                 |
                 x
                 ''' 
-                phase_array = [None] * 16
+                phase_array = np.zeros(16)
                 for M in range(4):
                     #iterate across a row with constant dx*M offset (0-3)
                     for N in range(4):
                         #iterate across columns with constant dy*N offset (0-3)
                         #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
-                        phase_array[N + 4*M] = int((np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360)
+                        phase_array[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
                 send_phases(phase_array) 
     #----END transmit page----
 
