@@ -400,7 +400,7 @@ def beam_page():
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
             # Header
-            ui.label('Receive mode') \
+            ui.label('Transmit mode') \
                 .classes('text-2xl font-bold text-center')
             with ui.row().classes('w-full justify-center items-center'):
                 ui.label('Please connect the phase shifting network\

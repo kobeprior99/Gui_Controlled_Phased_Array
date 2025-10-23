@@ -80,7 +80,6 @@ void sendControlWord(uint16_t word) {
   uint8_t si_bit  = digitalPinToBitMask(SI_PIN);
   uint8_t le_bit  = digitalPinToBitMask(LE_PIN);
 
-  noInterrupts(); //remove jitter during timing critical sections
   //iterate through the 13 bit control word lsb first
   for (uint8_t i = 0; i < 13; i++) {
     if ((word >> i) & 0x1)
@@ -104,5 +103,4 @@ void sendControlWord(uint16_t word) {
   short_nop_delay_5();
   *le_port &= ~le_bit; //latch low
 
-  interrupts();
 }
