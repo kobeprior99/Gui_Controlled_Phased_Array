@@ -231,7 +231,8 @@ def manual_page():
     def submit(sliders):
         #ensure integer values
         values = np.array([s.value for s in sliders])
-        print(f'values are {values}')
+        #debug 
+        #print(f'values are {values}')
         #SEND values to arduino
         send_phases(values)
 
