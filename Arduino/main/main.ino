@@ -2,111 +2,111 @@
  * Project:   GUI Controlled Phase Shifter
  * File:      main.ino
  * Author:    Kobe Prior
- * Date:      September 10, 2025
  * Board:     Arduino Mega (ATmega 2560)
  *
  * Description:
- *    This file allows the arduino to listens for serial input from the graphical user inteface
- *    script for a list of phase excitations to apply to each port. These phases are converted to digital phase words 
- *    in the format expected by the PE44280 8 bit phase shifter.
- *
- * Hardware Connections:
- *   - GND (Arduino) -> GND (Custom PCB)
- *   - 5V (Arduino) -> 5V (Custom PCB)
- *   - SCL (Arduino) -> CLK (Custom PCB)
- *   - MOSI (Arduino) -> SI (Custom PCB)
- *   - Pin 53 (Arduino) -> LE (Custom PCB)
- *   
- * Dependencies:
- *   - None (uses standard Arduino libraries)
- *
- * Notes:
- *   -Min pulse width for TLEPW = 30ns We can target ~ >60ns 
+ *    Drives the PE44280 8-bit phase shifter using serial input from a GUI.
+ *    Implements faster clock generation using direct port manipulation
+ *    for more precise timing (~1 µs high/low).
  */
+#include <math.h>
+// -----------PIN Assignments----------------
+#define SI_PIN   51  // MOSI
+#define CLK_PIN  52  // SCK
+#define LE_PIN   53  // SS
 
-//include SPI library
-#include <SPI.h>
-
-//define constants
 #define NUM_ELEMENTS 16
+const float PHASE_STEP = 1.40625;
 
-//constant fixed phase resolution (step)
-const float PHASE_STEP 1.40625
-
-//intermediate phase value before converted into phase word
-uint16_t phase; 
-
-//the phase word we want to send (8 bits)
-uint8_t digital_word; 
-
-//Phase optimization bit (1 bit) -> tied to 90deg bit in phase word
-bool phaseOPT = 0; 
-
-//the address of the port that we want to send a command to (4 bits)
-uint8_t addr; 
-
-//Use SS pin as LE
-const uint8_t LE_PIN = 53; 
-
-//We will stitch together the phase word opt bit and address into the control word
+// ------------Variables------------------
+uint16_t phase;
+uint8_t digital_word;
+bool phaseOPT = 0;
+uint8_t addr;
 uint16_t control_word;
 
-
+// -------------Setup----------------------
 void setup() {
-
-  //Recieve Data from the GUI
   Serial.begin(115200);
 
-  //configure latch enable pin
+  pinMode(SI_PIN, OUTPUT);
+  pinMode(CLK_PIN, OUTPUT);
   pinMode(LE_PIN, OUTPUT);
-  digitalWrite(LE_PIN, LOW);
 
-  //Start SPI
-  SPI.begin();
-  SPI.beginTransaction(SPISettings(14000000, LSBFIRST, SPI_MODE0));
+  digitalWrite(SI_PIN, LOW);
+  digitalWrite(CLK_PIN, LOW);
+  digitalWrite(LE_PIN, LOW);
 }
 
-void loop(){
-
-  if (Serial.available() >= 2 * NUM_ELEMENTS){
-
-    for (uint8_t i=0; i < NUM_ELEMENTS; i++){
-
-      //read high and low bytes
+// -------------Main Loop------------------
+void loop() {
+  if (Serial.available() >= 2 * NUM_ELEMENTS) {
+    for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
       byte high = Serial.read();
       byte low = Serial.read();
+      phase = (high << 8) | low;
 
-      //stich high and low bytes together to form 16 bit integer[highbyte lowbyte] -> 16 bit integer
-      phase = ( high << 8 ) | low; 
+      phaseOPT = (phase >> 7) & 0x1;
+      addr = (i & 0xF);
+      digital_word = (uint8_t)(round((phase / PHASE_STEP)) & 0xFF);
 
-      //the phase opt bit is synchronized with the 90 degree bit
-      //the right shift by 7 to get the second most significant bit value which is the 90 degree bit
-      phaseOPT = ( phase >> 7 ) & 0x1;
+      control_word = (addr << 9) | (phaseOPT << 8) | phase;
 
-      //if i is 2 addr will be 0010
-      addr = (i & 0xF); 
-
-      //we bit wise & with 11111111 so any overflow like 256 wraps back to 0.
-      digital_word = (uint8_t)( round( ( phase / PHASE_STEP ) ) & ( 0xFF );
-
-      //so the phase word looks like (MSB > LSB) A3 A2 A1 A0 OPT D7 D6 D5 D4 D3 D2 D1 D0
-      control_word = ( addr << 9 ) | ( phaseOPT << 8 ) | phase;
-
-      //send control word
-      sendControlWord (control_word);
-
+      sendControlWord(control_word);
     }
+  }
+}
+static inline void short_nop_delay_5(){
+  asm volatile (
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    "nop\n\t"
+    ::: "memory"
+  );
+}
+// --------------Fast Bit-Banging ----------
+void sendControlWord(uint16_t word) {
+  /*
+  @brief sends control word LSB to MSB as directed by datashee
+  */
+  
+  // Get direct port registers for speed
+  //digitalPinToPort returns port
+  // portOutputRegister returns a pointer to emmory mapped output registor for port
+  //This allows us direct access to flip the actual bits in the port hardware registers
+  volatile uint8_t *clk_port = portOutputRegister(digitalPinToPort(CLK_PIN));
+  volatile uint8_t *si_port  = portOutputRegister(digitalPinToPort(SI_PIN));
+  volatile uint8_t *le_port  = portOutputRegister(digitalPinToPort(LE_PIN));
+  //each port controls 8 pins these functions identify which bit is which pin
+  uint8_t clk_bit = digitalPinToBitMask(CLK_PIN);
+  uint8_t si_bit  = digitalPinToBitMask(SI_PIN);
+  uint8_t le_bit  = digitalPinToBitMask(LE_PIN);
 
+  noInterrupts(); //remove jitter during timing critical sections
+  //iterate through the 13 bit control word lsb first
+  for (uint8_t i = 0; i < 13; i++) {
+    if ((word >> i) & 0x1)
+      //if the bit is 1 set SI high
+      //or it with the mask
+      *si_port |= si_bit;
+    else
+      //if the bit 0 low set SI low
+      *si_port &= ~si_bit;
+
+    // ~1 µs pulse using tuned NOP delay
+    short_nop_delay_5();
+    *clk_port |= clk_bit; //clock high
+    short_nop_delay_5();
+    *clk_port &= ~clk_bit; //clock low
+    short_nop_delay_5();
   }
 
-}
+  // LE pulse (latch enable)
+  *le_port |= le_bit; //latch high
+  short_nop_delay_5();
+  *le_port &= ~le_bit; //latch low
 
-void sendControlWord(uint16_t control_word){
-  //Send control word LSB to MSB
-
-  //latch width should be a minimum of 30ns we'll use 60ns to be save
-  digitalWrite(LE_PIN, HIGH);
-  //use 1 no operation for 62.5ns delay ~60ns since we know 30ns is the minimum LE width
-  __asm__("nop\n\t");
-  digitalWrite(LE_PIN, LOW);
+  interrupts();
 }
