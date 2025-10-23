@@ -510,8 +510,9 @@ def calibrate():
             ui.label('Phase Calibration') \
                 .classes('text-2xl font-bold text-center')
         with ui.row().classes('w-full justify-center items-center'):
-            ui.label('The phase of each shifter is set to 0 degrees.').classes('text-base text-gray-600 text-center')
-            ui.label('Please connect the phase shifting network with a vector network analyzer Port 1 -> RFin and Port 2 -> 1 of the 16 output ports.').classes('text-base text-gray-600 text-center')
+            ui.label('The phase of each shifter is set to 0°.').classes('text-base text-gray-600 text-center')
+            ui.label('Please connect the phase shifting network with to a VNA: Port 1 -> RFin and Port 2 ->  one of the 16 output ports.').classes('text-base text-gray-600 text-center')
+            
             ui.label('Enter the phase (in degrees) from the S21 measurement for each port.').classes('text-base text-gray-600 text-center')
             
     def prompt_save_calibration():
