@@ -5,19 +5,22 @@
  Description:  Main control interface for a low-cost 16-element phase shifter.
                
                This program provides a graphical user interface (GUI) built 
-               with NiceGUI for controlling, calibrating, and testing a 
-               4x4 antenna array driven by an Arduino-based phase shifter 
-               network. Users can:
+               with NiceGUI for calibrating and controlling an Arduino-driven
+               phase shifting network.
+
+               Users can:
                  - Manually set phase values for each element
                  - Load and save calibration data
                  - Generate predefined phase profiles for OAM and Hermite modes
                  - Perform beam steering and visualization
-                    -Receive Mode (DOA approx)
-                    -Transmit Mode (Qualitative gain pattern)
+                    -Receive Mode (DOA Approximation)
+                    -Transmit Mode (Psuedo Gain Pattern analysis)
                
                The system communicates with the Arduino over a serial interface,
-               sending phase commands as packed bytes. Designed for educational 
-               and research applications in phased array beamforming.
+               sending phase commands as packed bytes. 
+
+               Designed for educational and research applications in phased array
+               beamforming and the generation of structured waveforms.
 ===============================================================================
 """
 #import all necessary libraries
@@ -26,6 +29,7 @@ from nicegui import ui
 import numpy as np 
 from config import *
 from AF_Calc import *
+
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
@@ -45,6 +49,7 @@ def update_phase(index:int, value:int):
 
     except ValueError:
         pass #ignore invalid inputs
+
 def update_phase_inputs():
     '''Referesh displayed UI numbers when phase_offsets changes.'''
     for i, input_field in enumerate(phase_inputs):
@@ -82,9 +87,9 @@ def set_com_port(port:str):
     try:
         ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
         time.sleep(3)#allow arduino to reset
-        print('Serial port opened')
+        ui.notify('Serial port opened')
     except Exception as e:
-        print(f'Failed to open serial port: {e}')
+        ui.notify(f'Failed to open serial port: {e}', color = 'red')
 
 # <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
@@ -94,14 +99,10 @@ def send_phases(phases: np.ndarray):
     Args:
         phases (numpy array): List of 16 floats (0-360) for each element
     """
-    #first apply phase offsets 
-    #since it's a numpy array element wise subtraction
-    phases_to_send = (phases - PHASE_OFFSETS) % 360 
-    
     #vectorized conversion to 8-bit 
-    #scales degrees 0-360 to 0-255
-    #snaps to nearest integer and modulo is implicit in type delcaration
-    hardware_phases = np.round((phases_to_send / 360) *255).astype(np.uint8)
+    #scales degrees 0-360 to phase_words 0-255
+    #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
+    hardware_phases = np.round(((phases - PHASE_OFFSETS) / 360) * 255).astype(np.uint8)
     #send the phases
     ser.write(hardware_phases.tobytes()) 
 
@@ -134,35 +135,40 @@ def main_page():
     ('/beam', 'Beam_Control.png'),
     ('/calibrate', 'Calibration.png')
     ]
-    # Define CSS animation for flashing
-    ui.add_head_html('''
-    <style>
-        @keyframes flash {
-          0%, 100% { filter: brightness(100%); }
-          50% { filter: brightness(200%); }
-        }
-        .flash {
-          animation: flash 1s infinite;
-        }
-    </style>
-    ''')
 
     with ui.column().classes('w-full items-center'):
         ui.label('Antenna Array Control').classes('text-3xl font-bold mb-8')
+    
+    ui.add_head_html('''
+        <style>
+            /* === Subtle Blink Animation (opacity only) === */
+            @keyframes blink {
+              0%, 100% {
+                opacity: 1;
+              }
+              50% {
+                opacity: 0.4;
+              }
+            }
+
+            /* === Blink Class === */
+            .blink {
+              animation: blink 1.2s ease-in-out infinite;
+            }
+        </style>
+    ''')
+
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in images:
             classes_style = 'w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200' 
-            if target == '/calibrate':
-            #store a reference to the calibrate image
-                calibrate_image = ui.image(f'media/{filename}')\
-                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200')\
-                .on('click', lambda t=target: navigate_if_ready(t))
+            if target == images[len(images) - 1][0] and not PHASE_CORRECTED: 
+                ui.image(f'media/{filename}')\
+                    .classes(f'{classes_style} blink') \
+                    .on('click', lambda t=target: navigate_if_ready(t))
             else:
                 ui.image(f'media/{filename}')\
                     .classes(classes_style) \
                     .on('click', lambda t=target: navigate_if_ready(t))
-    if PHASE_CORRECTED == False:
-        calibrate_image.classes(add='flash')
     
     def navigate_if_ready(target):
         """Navigate only if a valid com is selected"""
@@ -468,7 +474,7 @@ def beam_page():
                         #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
                         phase_array[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
                 try: 
-                    send_phases(values)
+                    send_phases(phases)
                 except Exception as e:
                     ui.notify(f'Failed to send phases: {e}', color = 'red')
                 else:
