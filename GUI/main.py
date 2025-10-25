@@ -28,6 +28,7 @@ import time, serial, struct, serial.tools.list_ports,json
 from nicegui import ui
 import numpy as np 
 from config import *
+import asyncio
 from AF_Calc import *
 
 #global serial handler
@@ -52,9 +53,10 @@ def update_phase(index:int, value:int):
 
 def update_phase_inputs():
     '''Referesh displayed UI numbers when phase_offsets changes.'''
-    for i, input_field in enumerate(phase_inputs):
-        input_field.value = int(PHASE_OFFSETS[i])
-
+    #only update changed fields 
+    for i, (field, val) in enumerate(zip(phase_inputs, PHASE_OFFSETS)):
+        if field.value !=val:
+            field.value = val
 def save_calibration(filename:str):
     '''
     Save the calibration as a json file to be used on later runs
@@ -80,13 +82,14 @@ def use_calibration_file(filename:str):
 
 
 SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
-def set_com_port(port:str):
+async def set_com_port(port:str):
     global SELECTED_COM_PORT,ser
     SELECTED_COM_PORT = port
-    print(f'COM port set to {SELECTED_COM_PORT}')
+    #debug
+    #print(f'COM port set to {SELECTED_COM_PORT}')
     try:
         ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
-        time.sleep(3)#allow arduino to reset
+        await asyncio.sleep(3)#allow arduino to reset
         ui.notify('Serial port opened')
     except Exception as e:
         ui.notify(f'Failed to open serial port: {e}', color = 'red')
@@ -124,8 +127,8 @@ def main_page():
     # COM port
     com_input = ui.select(
         options = portsList, 
-        label =SELECTED_COM_PORT,
-        on_change=lambda e: set_com_port(e.value)
+        label =selected_com_port,
+        on_change=lambda e: asyncio.create_task(set_com_port(e.value))
     ).style('width: 300px')
 
     images = [
@@ -298,8 +301,7 @@ def oam_page():
 
             elif mode == '1':
                 #OAM mode 1
-                phases *= 1
-                
+                pass 
             elif mode =='2':
                 # Mode 2 
                 phases *= 2
@@ -393,7 +395,6 @@ def hermite_page():
 
 
 #----Beam Steering----
-
 @ui.page('/beam')
 def beam_page():
     ui.label('Beam Scanning (Receive Mode)')
@@ -404,7 +405,8 @@ def beam_page():
         ui.button('Transmit Mode', on_click=lambda: ui.navigate.to('/transmit_mode')).\
         classes('w-64 h-24 text-xl')
     
-    #Sub Pages----]=========-    
+    
+    #----Sub Pages----    
 
     #----Transmit Mode ----
     @ui.page('/transmit_mode')
@@ -451,7 +453,7 @@ def beam_page():
                 
                 image_container.clear() #remove any existing images
                 with image_container:
-                    ui.image('media/AF.png').style('width:45%;').force_reload()
+                    ui.image('media/AF.png').style('width:65%;').force_reload()
 
                 '''  
                 recall array elements are like
@@ -466,13 +468,13 @@ def beam_page():
                 |
                 x
                 ''' 
-                phase_array = np.zeros(16)
+                phases = np.zeros(16)
                 for M in range(4):
                     #iterate across a row with constant dx*M offset (0-3)
                     for N in range(4):
                         #iterate across columns with constant dy*N offset (0-3)
                         #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
-                        phase_array[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
+                        phases[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
                 try: 
                     send_phases(phases)
                 except Exception as e:

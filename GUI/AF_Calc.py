@@ -16,11 +16,13 @@ Dependencies:
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits import mplot3d
+from matplotlib import cm
+from matplotlib.colors import ListedColormap
+from mpl_toolkits.mplot3d import Axes3D
 #config file contains some useful constants that we'll make use of 
 from config import *
 
-def find_phase_shift(theta_0, phi_0, dx, dy):
+def find_phase_shift(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     '''
     Calculate the phase shifts required to steer in certain direction
 
@@ -48,19 +50,17 @@ def find_phase_shift(theta_0, phi_0, dx, dy):
 
     return beta_X, beta_Y
 
-def dispAF(dx, dy, beta_x, beta_y,disp):
+def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     '''
     Plots the array factor for a default square array defined in config file 
     Notes
     -----
-    This function uses the config file which gives parameters for default array
-
     Parameters
     ----------
     dx: float
-        horizontal spacing between elements (fraction of wavelength)
+        X spacing between elements (fraction of wavelength)
     dx: float
-        vertical spacing between elements (fraction of wavelength)
+        Y spacing between elements (fraction of wavelength)
     beta_X: float 
         Progressive phase shift in x direction
     beta_Y: float 
@@ -72,17 +72,18 @@ def dispAF(dx, dy, beta_x, beta_y,disp):
     none
     plots the array factor magnitude 
     '''
-   
-    #TODO define THETA and PHI meshgrid
+    # define theta phi mesh grid 
     theta = np.linspace(0, np.pi/2, 300)
     phi = np.linspace(0, np.pi * 2, 600)
     THETA, PHI = np.meshgrid(theta, phi)
+    
+    # Define x part of array factor 
     Nside = int(np.sqrt(NUM_ELEMENTS))
-    Sxm = 0
+    Sxm = np.zeros_like(THETA, dtype=complex) 
     for m in range(Nside):
         Sxm += np.exp(1j * m * (2*np.pi*dx*np.sin(THETA)*np.cos(PHI) + beta_x)) 
-    
-    Syn = 0 
+    # Define y part of array factor 
+    Syn = np.zeros_like(THETA, dtype=complex) 
     for n in range(Nside): 
         Syn += np.exp(1j*n*(2*np.pi*dy*np.sin(THETA)*np.sin(PHI) + beta_y)) 
 
@@ -93,16 +94,47 @@ def dispAF(dx, dy, beta_x, beta_y,disp):
     X = AF_mag_norm * np.sin(THETA) * np.cos(PHI)
     Y = AF_mag_norm * np.sin(THETA) * np.sin(PHI)
     Z = AF_mag_norm * np.cos(THETA)
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection = '3d')
-    surf = ax.plot_surface(X, Y, Z, cmap ='plasma')
-    ax.set_xlim(-1.01, 1.01)
-    ax.set_ylim(-1.01, 1.01)
-    ax.set_zlim(0, 1.01)
-    ax.set_title('Array Factor')
-    fig.colorbar(surf)
+    fig = plt.figure(figsize=(9,7))
+    ax = fig.add_subplot(111, projection='3d')  
+    cmap = cm.jet
+    custom_cmap = ListedColormap(cmap(np.linspace(0.3, 1, 256)))
+    surf = ax.plot_surface(
+        X,Y,Z,
+        rstride=3, cstride=3,
+        cmap=custom_cmap,
+        edgecolors='k', 
+        linewidth=0.2,
+        antialiased=True
+    )
+    #color bar
+    m = cm.ScalarMappable(cmap=custom_cmap)
+    m.set_array(AF_mag_norm)
+    cbar = fig.colorbar(m, ax=ax, shrink=0.6, aspect=15)
+    cbar.set_label('Normalized Array Factor (linear scale)', fontsize=10)
+
+    ax.set_xlim(-1,1)
+    ax.set_ylim(-1,1)
+    ax.set_zlim(0,1)
+    ax.set_box_aspect([1,1,1])
+    ax.set_axis_off()
+    #Redraw Custon Axes through the origin
+    #X
+    ax.plot([-1,1], [0,0], [0,0], color = 'k', lw=2)
+    ax.text(1.2,0,0,'X', color='k', fontsize=12, fontweight = 'bold')
+    #Y
+    ax.plot([0,0], [-1,1], [0,0], color = 'k', lw=2)
+    ax.text(0,1.2,0,'Y', color='k', fontsize=12, fontweight = 'bold')
+    #Z
+    ax.plot([0,0], [0,0], [0,1], color = 'k', lw=2)
+    ax.text(0,0,1.1,'Z', color='k', fontsize=12, fontweight = 'bold')
+
+    ax.grid(True, linestyle = '--', linewidth = 0.5)
+    ax.set_title('Normalized Array Factor (Spherical Format)', pad=20)
+    ax.view_init(elev=25, azim=30)
+    # ax.dist = 9
+
     if not disp:
-        plt.savefig('media/AF.png', bbox_inches='tight')
+        plt.savefig('media/AF.png', bbox_inches='tight', dpi = 300)
     else:
         plt.show()
 
@@ -114,7 +146,21 @@ def main():
     beta_x, beta_y = find_phase_shift(desired_theta, desired_phi, dx, dy)
     dispAF(dx, dy, beta_x, beta_y,disp=True)
 
-def runAF_Calc(dx,dy,theta,phi):
+def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->tuple:
+    '''
+    run the array factor calculation to get progressive phase shifts
+    and generate plot
+    Parameters:
+        dx: float
+            horizontal spacing between elements (fraction of wavelength)
+        dx: float
+            vertical spacing between elements (fraction of wavelength)
+        theta: float
+            desired elevaiton steering angle
+        phi:
+            desired azimuthal steering angle
+    Returns: (betaX, betaY)
+    '''
     betaX,betaY = find_phase_shift(theta, phi, dx,dy) 
     dispAF(dx,dy,betaX,betaY,disp=False)
     #return betax and y to be used in actually shifting the array
