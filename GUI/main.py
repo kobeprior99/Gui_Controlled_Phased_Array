@@ -90,9 +90,8 @@ async def set_com_port(port:str):
     try:
         ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
         await asyncio.sleep(3)#allow arduino to reset
-        ui.notify('Serial port opened')
     except Exception as e:
-        ui.notify(f'Failed to open serial port: {e}', color = 'red')
+        print(f'Failed to open serial port: {e}')
 
 # <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
@@ -105,7 +104,8 @@ def send_phases(phases: np.ndarray):
     #vectorized conversion to 8-bit 
     #scales degrees 0-360 to phase_words 0-255
     #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
-    hardware_phases = np.round(((phases - PHASE_OFFSETS) / 360) * 255).astype(np.uint8)
+    #adding 0.5 ensures when type conversion happens we round to the nearest integer instead of truncating
+    hardware_phases = np.uint8(((phases - PHASE_OFFSETS) * (255/360)) + 0.5)
     #send the phases
     ser.write(hardware_phases.tobytes()) 
 
@@ -127,7 +127,7 @@ def main_page():
     # COM port
     com_input = ui.select(
         options = portsList, 
-        label =selected_com_port,
+        label =SELECTED_COM_PORT,
         on_change=lambda e: asyncio.create_task(set_com_port(e.value))
     ).style('width: 300px')
 
