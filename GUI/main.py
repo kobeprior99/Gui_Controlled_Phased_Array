@@ -26,7 +26,8 @@ from nicegui import ui
 import numpy as np 
 from config import *
 from AF_Calc import *
-
+#global serial handler
+ser = None
 #Phase offsets stored globally to be used across the program
 PHASE_OFFSETS =np.zeros(16,dtype=int)
 #flag to tell the user to calibrate if they haven't already
@@ -75,20 +76,16 @@ def use_calibration_file(filename:str):
 
 SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
 def set_com_port(port:str):
-    global SELECTED_COM_PORT
+    global SELECTED_COM_PORT,ser
     SELECTED_COM_PORT = port
     print(f'COM port set to {SELECTED_COM_PORT}')
+    try:
+        ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
+        time.sleep(3)#allow arduino to reset
+        print('Serial port opened')
+    except Exception as e:
+        print(f'Failed to open serial port: {e}')
 
-
-def degrees_to_8bit(value: float)-> int:
-    '''
-    Convert a phase in degrees to an 8 bit hardware value (0-255),
-    snapping to the nearest step.
-    '''
-    #8 bit step size
-    step = 360 / 256
-    #divide by step, round to nearest integer wrap 0-256
-    return int(round(value/step)) % 256
 # <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
     """
@@ -97,20 +94,16 @@ def send_phases(phases: np.ndarray):
     Args:
         phases (numpy array): List of 16 floats (0-360) for each element
     """
-    # first apply phase offsets 
+    #first apply phase offsets 
     #since it's a numpy array element wise subtraction
     phases_to_send = (phases - PHASE_OFFSETS) % 360 
-    hardware_phases = np.array([degrees_to_8bit(p) for p in phases_to_send], dtype= np.uint8)
-    try: 
-        ser = serial.Serial(SELECTED_COM_PORT, BAUDRATE)
-        time.sleep(3)#wait for Arduino to reset
-        #send as raw bytes (1 byte per element)
-        ser.write(hardware_phases.tobytes()) 
-        print(f'sent: {hardware_phases}')
-        ui.notify(f'Successfully sent phases to Arduino on {SELECTED_COM_PORT}')
-    except Exception as e:
-        ui.notify(f"failed to connect/send: {e}", color='red')
-        print(e) 
+    
+    #vectorized conversion to 8-bit 
+    #scales degrees 0-360 to 0-255
+    #snaps to nearest integer and modulo is implicit in type delcaration
+    hardware_phases = np.round((phases_to_send / 360) *255).astype(np.uint8)
+    #send the phases
+    ser.write(hardware_phases.tobytes()) 
 
 
 
@@ -234,8 +227,12 @@ def manual_page():
         #debug 
         #print(f'values are {values}')
         #SEND values to arduino
-        send_phases(values)
-
+        try: 
+            send_phases(values)
+        except Exception as e:
+            ui.notify(f'Failed to send phases: {e}', color = 'red')
+        else:
+            ui.notify('Sucessfully sent phases')
 
 #---- END Manual PAGE ----
 
@@ -306,7 +303,12 @@ def oam_page():
                 phases *= 3
 
             #send the appropriate phase
-            send_phases(phases)
+            try: 
+                send_phases(phases)
+            except Exception as e:
+                ui.notify(f'Failed to send phases: {e}', color = 'red')
+            else:
+                ui.notify('Sucessfully sent phases')
 
 #----END OAM MODE ----
 
@@ -371,7 +373,13 @@ def hermite_page():
             phases = np.array([
                 0,0,180,180,0,0,180,180,180,180,0,0,180,180,0,0
             ]) 
-        send_phases(phases)
+    
+        try: 
+            send_phases(phases)
+        except Exception as e:
+            ui.notify(f'Failed to send phases: {e}', color = 'red')
+        else:
+            ui.notify('Sucessfully sent phases')
    
 #---- END Hermite ----
 
@@ -459,7 +467,12 @@ def beam_page():
                         #iterate across columns with constant dy*N offset (0-3)
                         #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
                         phase_array[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
-                send_phases(phase_array) 
+                try: 
+                    send_phases(values)
+                except Exception as e:
+                    ui.notify(f'Failed to send phases: {e}', color = 'red')
+                else:
+                    ui.notify('Sucessfully sent phases')
     #----END transmit page----
 
 
@@ -510,7 +523,13 @@ def calibrate():
     #implement calibration page
     ui.button('⬅ Back', on_click=ui.navigate.back)
     #start by sending 0 phase to each port 
-    send_phases(np.zeros(16, dtype=int))
+    try: 
+        send_phases(np.zeros(16))
+    except Exception as e:
+        ui.notify(f'Failed to send phases: {e}', color = 'red')
+    else:
+        ui.notify('Zero phase sent successfully')
+
     with ui.column().classes('w-full'):
         with ui.row().classes('w-full justify-center items-center'):
             ui.label('Phase Calibration') \
