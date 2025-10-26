@@ -1,7 +1,6 @@
-import adi
+import time, adi, threading
 import numpy as np
-from config import FREQ, BASE_BAND, SAMP_RATE, BUFFER_SIZE
-import threading
+from config import FREQ, BASE_BAND, SAMP_RATE 
 
 # --- Connect to PlutoSDR ---
 sdr = adi.Pluto("ip:192.168.2.1")
@@ -16,7 +15,6 @@ sdr.tx_cyclic_buffer = True
 sdr.rx_lo = int(FREQ)                     # RF carrier in Hz
 sdr.rx_sample_rate = int(SAMP_RATE)
 sdr.rx_rf_bandwidth = int(SAMP_RATE)
-sdr.rx_buffer_size = BUFFER_SIZE
 sdr.gain_control_mode_chan0 = "manual"
 sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
 
@@ -25,6 +23,7 @@ BURST_DURATION = 0.001 #seconds
 num_samples = int(BURST_DURATION * SAMP_RATE)
 TONE = 0.5 * np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
 TONE = TONE.astype(np.complex64)
+sdr.rx_buffer_size = len(TONE)
 
 def continuous_tx():
     sdr.tx(TONE)
@@ -44,7 +43,33 @@ def get_energy() -> float:
 
 # --- Example usage ---
 if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    DURATION = 15 #seconds
+    INTERVAL = 1 #seconds
+    n_samples = DURATION/INTERVAL
+    energies =[]
+
     tx_thread = threading.Thread(target=continuous_tx, daemon=True)
     tx_thread.start()
-    energy = get_energy()
-    print(f'Received energy: {energy:.2f}')
+    #let transmit settle
+    time.sleep(0.01)
+    start_time = time.time()
+    for i in range(int(n_samples)):
+        energy = get_energy()
+        energies.append(energy)
+        #wait until next seconds
+        elapsed = time.time() - start_time
+        next_tick = (i+1)*INTERVAL
+        sleep_time = next_tick -elapsed
+        if sleep_time >0:
+            time.sleep(sleep_time)
+    times = np.arange(0,DURATION, INTERVAL)
+    plt.figure(figsize=(8,5))
+    plt.plot(times,energies, marker='o')
+    plt.xlabel('Time [s]')
+    plt.ylabel('Received energy')
+    plt.title("energy vs time")
+    plt.grid(True)
+    plt.show()
+    sdr.tx_destroy_buffer()
+    sdr = None

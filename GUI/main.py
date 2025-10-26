@@ -24,14 +24,14 @@
 ===============================================================================
 """
 #import all necessary libraries
-import time, serial, struct, serial.tools.list_ports,json
+import time, serial, struct, serial.tools.list_ports,json,threading
 from nicegui import ui
 import numpy as np 
-from config import BAUDRATE, DX, DY  
+from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE  
 import asyncio
 from AF_Calc import runAF_Calc
 from create_default_rx_grid import DEFAULT_RX_GRID
-
+from PLUTO import get_energy, continuous_tx
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
@@ -456,6 +456,7 @@ def beam_page():
                 with image_container:
                     ui.image('media/AF.png').style('width:65%;').force_reload()
                 try: 
+                    #start transmit thread -> then sample energy with get_energy 
                     send_phases(phases)
                     #TODO add SDR FUNCTIONALITY and Plotting
                 except Exception as e:
@@ -469,25 +470,7 @@ def beam_page():
 
     @ui.page('/receive_mode')
     def receive_mode():        
-        def Scan_Beam():
-            '''
-            Scan through all combinations of theta and phi then report the direction
-            of arival as a magnitude plot with a peak in the best link direction 
-            Uses a precomputed search grid and iterates through it
-            
-            Creates and displays 2 plots:
-                Relative gain? vs theta
-                Relative gain? vs phi
-            '''
-            for phases in DEFAULT_RX_GRID:
-                #recal DEFAULT_RX_GRID has entries like
-                #we want to send the phase then record the relative amplitude 
-                send_phases(phases)
-                #TODO record relative gain with PLUTO SDR and saved
-            #TODO Plot 
-            #mabe a heat map would be nice with theta on one 
-            #axes and theta and phi the other and a hot spot on the best angle
-             
+
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
@@ -510,8 +493,42 @@ def beam_page():
                 ui.label('The coefficients are precomputed for the default array')\
                 .classes('text-base text-gray-600 text-center')
                 ui.button('Start', on_click=Scan_Beam)
-        
-
+        image_container = ui.row()\
+            .classes('w-full justify-center items-center')\
+            .style('order:2;')
+            
+        def Scan_Beam():
+            '''
+            Scan through all combinations of theta and phi then report the direction
+            of arival as a magnitude plot with a peak in the best link direction 
+            Uses a precomputed search grid and iterates through it
+            
+            Creates and displays heatmap plot:
+            '''
+            #start tx thread
+            tx_thread = threading.Thread(target=continuous_tx, daemon=True)
+            tx_thread.start()
+            n_steps = len(DEFAULT_RX_GRID)
+            energies = np.zeros(n_steps)
+            for i, phases in enumerate(DEFAULT_RX_GRID):
+                send_phases(phases)
+                #might have to wait for phase to stabalize?
+                energies[i] = get_energy()
+            
+            #Reshape energies for heat mpat
+            energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE)) 
+            
+            plt.figure(figsize=(8,6))
+            plt.imshow(energies_2D, extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],origin='lower', aspect='auto', cmap='hot')
+            plt.colorbar(label='Received energy')
+            plt.xlabel('Phi [deg]')
+            plt.ylabel('Theta [deg]')
+            plt.title('Beam scan - received energy vs steering angles')
+            plt.savefig('rx_heat.png',dpi=300)
+             
+            image_container.clear() #remove any existing images
+            with image_container:
+                ui.image('media/rx_heat.png').style('width:65%;').force_reload()
         #----Receive Mode page----
 
 
