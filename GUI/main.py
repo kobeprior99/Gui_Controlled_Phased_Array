@@ -27,9 +27,10 @@
 import time, serial, struct, serial.tools.list_ports,json
 from nicegui import ui
 import numpy as np 
-from config import *
+from config import BAUDRATE, DX, DY  
 import asyncio
-from AF_Calc import *
+from AF_Calc import runAF_Calc
+from create_default_rx_grid import DEFAULT_RX_GRID
 
 #global serial handler
 ser = None
@@ -430,8 +431,8 @@ def beam_page():
         
 
             with ui.row().classes('w-full justify-center items-center'):
-                dx = ui.number(label = 'dx (λ)', value=0.5, min=0.1).style('width:20%')
-                dy = ui.number(label = 'dy (λ)', value=0.5, min=0.1).style('width:20%')
+                dx = ui.number(label = 'dx (λ)', value=DX, min=0.1).style('width:20%')
+                dy = ui.number(label = 'dy (λ)', value=DY, min=0.1).style('width:20%')
                 theta = ui.number(label = 'Theta (degrees)', value=0, min = 0, max=90).style('width:20%')
                 phi = ui.number(label = 'Phi (degrees)', value=0, min = 0, max = 360).style('width:20%')
                  
@@ -449,34 +450,14 @@ def beam_page():
                 to show relative magnitudes at different angles
                 '''
                 #show the user what the expected beam pattern
-                beta_x, beta_y = runAF_Calc(dx.value,dy.value,theta.value,phi.value)
+                phases = runAF_Calc(dx.value,dy.value,theta.value,phi.value)
                 
                 image_container.clear() #remove any existing images
                 with image_container:
                     ui.image('media/AF.png').style('width:65%;').force_reload()
-
-                '''  
-                recall array elements are like
-                1 2 3 4
-                5 6 7 8
-                9 10 11 12
-                13 14 15 16
-                where x goes down the rows and y goes across the columns
-                ---->y
-                |
-                |
-                |
-                x
-                ''' 
-                phases = np.zeros(16)
-                for M in range(4):
-                    #iterate across a row with constant dx*M offset (0-3)
-                    for N in range(4):
-                        #iterate across columns with constant dy*N offset (0-3)
-                        #example N = 3 M = 2 element address = 3 +4*2 = 11 ->index of 10th   
-                        phases[N + 4*M] = (np.rad2deg(beta_x) * M + np.rad2deg(beta_y) * N) % 360
                 try: 
                     send_phases(phases)
+                    #TODO add SDR FUNCTIONALITY and Plotting
                 except Exception as e:
                     ui.notify(f'Failed to send phases: {e}', color = 'red')
                 else:
@@ -492,9 +473,21 @@ def beam_page():
             '''
             Scan through all combinations of theta and phi then report the direction
             of arival as a magnitude plot with a peak in the best link direction 
-            '''
-            pass
+            Uses a precomputed search grid and iterates through it
             
+            Creates and displays 2 plots:
+                Relative gain? vs theta
+                Relative gain? vs phi
+            '''
+            for phases in DEFAULT_RX_GRID:
+                #recal DEFAULT_RX_GRID has entries like
+                #we want to send the phase then record the relative amplitude 
+                send_phases(phases)
+                #TODO record relative gain with PLUTO SDR and saved
+            #TODO Plot 
+            #mabe a heat map would be nice with theta on one 
+            #axes and theta and phi the other and a hot spot on the best angle
+             
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
@@ -512,6 +505,9 @@ def beam_page():
             with ui.row().classes('w-full justify-center items-center'): 
                 ui.label('Place the transmitting antenna somewhere within line\
                  of sight of the receiving array, then press start when you are ready to scan')\
+                .classes('text-base text-gray-600 text-center')
+            with ui.row().classes('w-full justify-center items-center'): 
+                ui.label('The coefficients are precomputed for the default array')\
                 .classes('text-base text-gray-600 text-center')
                 ui.button('Start', on_click=Scan_Beam)
         

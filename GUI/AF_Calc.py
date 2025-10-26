@@ -18,11 +18,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import cm
 from matplotlib.colors import ListedColormap
-from mpl_toolkits.mplot3d import Axes3D
 #config file contains some useful constants that we'll make use of 
 from config import *
-
-def find_phase_shift(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
+DEFAULT_RX_GRID = None
+def find_betas(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     '''
     Calculate the phase shifts required to steer in certain direction
 
@@ -33,9 +32,9 @@ def find_phase_shift(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     phi_0: float
         azimuthal steer direction in degrees
     dx: float
-        horizontal spacing between elements (fraction of wavelength)
-    dx: float
-        vertical spacing between elements (fraction of wavelength)
+        x spacing between elements (fraction of wavelength)
+    dy: float
+        y spacing between elements (fraction of wavelength)
     Returns
     -------
     (beta_x, beta_y): float tuple
@@ -49,6 +48,26 @@ def find_phase_shift(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     beta_Y = -2 * np.pi * dy * np.sin(theta_0) * np.sin(phi_0)
 
     return beta_X, beta_Y
+
+
+def get_phase_shifts(beta_x: float, beta_y: float)->np.ndarray:
+    '''
+    Get the phase shifts to apply to each element in a N element array
+    Parameter:
+        beta_x(float):
+        beta_y(float):
+    Returns:
+        1D array of phases in degrees size =NUM_ELEMENTS defined in config fil
+    '''
+    #create index grids
+    M, N = np.meshgrid(np.arange(NSIDE), np.arange(NSIDE), indexing='ij')
+    #compute phase shifts for each element
+    phases = (beta_x * M + beta_y * N)
+    phases = np.degrees(phases) % 360
+    return phases.flatten()
+
+
+
 
 def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     '''
@@ -76,23 +95,26 @@ def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     theta = np.linspace(0, np.pi/2, 300)
     phi = np.linspace(0, np.pi * 2, 600)
     THETA, PHI = np.meshgrid(theta, phi)
+    # used multiple times 
+    sinTH =np.sin(THETA) 
+    cosPH = np.cos(PHI)
+    sinPH = np.sin(PHI)
     
     # Define x part of array factor 
     Nside = int(np.sqrt(NUM_ELEMENTS))
-    Sxm = np.zeros_like(THETA, dtype=complex) 
-    for m in range(Nside):
-        Sxm += np.exp(1j * m * (2*np.pi*dx*np.sin(THETA)*np.cos(PHI) + beta_x)) 
+    m_idx = np.arange(Nside).reshape(-1, 1, 1)
+    Sxm = np.sum(np.exp(1j * m_idx * (2*np.pi*dx*sinTH*cosPH + beta_x)), axis=0)
+      
     # Define y part of array factor 
-    Syn = np.zeros_like(THETA, dtype=complex) 
-    for n in range(Nside): 
-        Syn += np.exp(1j*n*(2*np.pi*dy*np.sin(THETA)*np.sin(PHI) + beta_y)) 
+    n_idx = np.arange(Nside).reshape(-1, 1, 1)
+    Syn = np.sum(np.exp(1j * n_idx * (2*np.pi*dy*sinTH*sinPH + beta_y)), axis=0)
 
     AF = Sxm * Syn
     AF_mag = np.abs(AF) 
     AF_mag_norm = AF_mag/np.max(AF_mag)
     #convert to cartesian coords
-    X = AF_mag_norm * np.sin(THETA) * np.cos(PHI)
-    Y = AF_mag_norm * np.sin(THETA) * np.sin(PHI)
+    X = AF_mag_norm * sinTH * cosPH
+    Y = AF_mag_norm * sinTH * sinPH
     Z = AF_mag_norm * np.cos(THETA)
     fig = plt.figure(figsize=(9,7))
     ax = fig.add_subplot(111, projection='3d')  
@@ -143,10 +165,10 @@ def main():
     dy = float(input('enter the vertical spacing dy in terms of wavelengths: '))
     desired_phi = float(input('enter the azimuthal steering direction (degrees): '))
     desired_theta = float(input('enter the elevation steering direction (degrees): '))
-    beta_x, beta_y = find_phase_shift(desired_theta, desired_phi, dx, dy)
+    beta_x, beta_y = find_betas(desired_theta, desired_phi, dx, dy)
     dispAF(dx, dy, beta_x, beta_y,disp=True)
 
-def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->tuple:
+def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->np.ndarray:
     '''
     run the array factor calculation to get progressive phase shifts
     and generate plot
@@ -159,12 +181,13 @@ def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->tuple:
             desired elevaiton steering angle
         phi:
             desired azimuthal steering angle
-    Returns: (betaX, betaY)
+    Returns: phases an array of the phases that go to each element 
     '''
-    betaX,betaY = find_phase_shift(theta, phi, dx,dy) 
+    betaX,betaY = find_betas(theta, phi, dx,dy) 
+    phases = get_phase_shifts(betaX, betaY)
     dispAF(dx,dy,betaX,betaY,disp=False)
     #return betax and y to be used in actually shifting the array
-    return betaX, betaY
+    return phases 
     
 #run that shit
 if __name__ == '__main__':
