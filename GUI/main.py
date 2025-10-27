@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import asyncio
 from AF_Calc import runAF_Calc
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, continuous_tx, stop_tx
+from PLUTO import get_energy, tx, stop_tx
 import plotly.graph_objects as go
 #global serial handler
 ser = None
@@ -460,12 +460,17 @@ def beam_page():
                 go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
             )
 
-            fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
-            live_plot = ui.plotly(fig).classes('w-full h-64')
+            fig.update_layout(
+                margin=dict(l=0, r=0, t=0, b=0),
+                xaxis_title='Time(s)',
+                yaxis_title='Avg Power Received'
+            )
+            live_plot = ui.plotly(fig).classes('w-3/4 h-64')
             image_container = ui.row()\
-                .classes('w-full justify-center items-center')\
-                .style('order:2;')
+                .classes('justify-center items-center')\
+            .style('order:2; width:80%;')
             stop_event = asyncio.Event()
+            
             
             def start_live_plot():
                 # Send initial phases
@@ -478,31 +483,50 @@ def beam_page():
                     ui.image('media/AF.png').style('width:65%;').force_reload()
 
                 # Start continuous TX
-                continuous_tx()
+                tx()
 
                 # Reset stop_event
                 stop_event.clear()
 
                 # Launch async update
                 asyncio.create_task(live_update())
+                new_angle_button.visible = True
+                stop_button.visible = True
 
             async def live_update():
                 t_values = []
                 energy_values = []
+                start_time = time.time()
+                last_theta = theta.value 
+                last_phi = phi.value
 
                 while not stop_event.is_set():
-                    t = time.time()
+                    t = time.time()-start_time
                     energy = get_energy()  # sample SDR
-
                     t_values.append(t)
                     energy_values.append(energy)
-
+                    t_values = t_values[-100:]
+                    energy_values = energy_values[-100:]
                     # Update the figure's data
                     fig.data[0].x = t_values
                     fig.data[0].y = energy_values
                     live_plot.update()  # NiceGUI triggers plot update
 
                     await asyncio.sleep(0.05)  # ~20 Hz refresh
+            def send_current_phase():
+                phases = runAF_Calc(
+                    dx.value, 
+                    dy.value, 
+                    theta.value,
+                    phi.value
+                )
+                send_phases(phases)
+                # Show AF image
+                image_container.clear()
+                with image_container:
+                    ui.image('media/AF.png')\
+                    .style('width:65%;')\
+                    .force_reload()
 
             def stop_live():
                 stop_tx()
@@ -511,7 +535,17 @@ def beam_page():
 
             # Buttons
             ui.button('Transmit & Live Plot', on_click=start_live_plot)
-            ui.button('Stop', on_click=stop_live)
+            new_angle_button = ui.button(
+                'New Angle', 
+                on_click = send_current_phase
+            ) 
+            new_angle_button.visible = False
+
+            stop_button = ui.button(
+                'Stop',
+                on_click=stop_live
+            )
+            stop_button.visible = False            
     #----END transmit page----
 
 
@@ -557,7 +591,7 @@ def beam_page():
             
             async def scan_task():
                 # Launch the scan as an async background task
-                continuous_tx()
+                tx()
                 n_steps = len(DEFAULT_RX_GRID)
                 energies = np.zeros(n_steps)
 
@@ -572,6 +606,7 @@ def beam_page():
 
                 # Reshape and plot
                 energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
+                energies_2D /= np.max(energies_2D)#normalize
                 plt.figure(figsize=(8, 6))
                 plt.imshow(
                     energies_2D,
@@ -583,7 +618,7 @@ def beam_page():
                 plt.colorbar(label='Received energy')
                 plt.xlabel('Phi [deg]')
                 plt.ylabel('Theta [deg]')
-                plt.title('Beam scan - received energy vs steering angles')
+                plt.title('Beam scan - normalized received energy vs steering angles')
                 plt.savefig('media/rx_heat.png', dpi=300)
                 plt.close()
 

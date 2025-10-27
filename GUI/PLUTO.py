@@ -1,30 +1,31 @@
-import time, adi, threading
+import time, adi 
 import numpy as np
-from config import freq, base_band, samp_rate,buffer_size, num_avg
+from config import FREQ , BASE_BAND, SAMP_RATE,BUFFER_SIZE,NUM_AVG 
 
 # --- connect to plutosdr ---
-sdr = adi.pluto("ip:192.168.2.1")
-sdr.sample_rate = int(samp_rate)
+sdr = adi.Pluto("ip:192.168.2.1")
+sdr.sample_rate = int(SAMP_RATE)
 
 # --- tx setup ---
-sdr.tx_rf_bandwidth = int(samp_rate)     # match baseband bw
-sdr.tx_lo = int(freq)                    # rf carrier in hz
+sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
+sdr.tx_lo = int(FREQ)                    # rf carrier in hz
 sdr.tx_hardwaregain_chan0 = -40          # adjust amplitude to avoid clipping
 sdr.tx_cyclic_buffer = True
 
 # --- rx setup ---
-sdr.rx_lo = int(freq)                     # rf carrier in hz
-sdr.rx_rf_bandwidth = int(samp_rate)
+sdr.rx_lo = int(FREQ)                     # rf carrier in hz
+sdr.rx_rf_bandwidth = int(SAMP_RATE)
 sdr.gain_control_mode_chan0 = "manual"
 sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
-sdr.rx_buffer_size = buffer_size 
+sdr.rx_buffer_size =  BUFFER_SIZE
 
 # --- tone generator ---
-#we use a cylic buffer so the duration doesn't really matter.
-burst_duration = 0.001 #seconds
-num_samples = int(burst_duration * samp_rate)
-Tone = np.exp(1j*2*np.pi*base_band*np.arange(num_samples)/samp_rate)
-Tone *= 2**14 
+duration = 0.01
+#ensure cyclic
+num_cycles = int(BASE_BAND * duration)
+num_samples = int(num_cycles * SAMP_RATE / BASE_BAND)
+TONE= np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
+TONE *= 2**14 
 
 def tx():
     '''Send the tone'''
@@ -45,7 +46,7 @@ def get_energy() -> float:
         rx = sdr.rx()
         power+= np.mean(np.abs(rx)**2)
     power /= NUM_AVG
-
+    return power
 
 # --- Example usage ---
 if __name__ == "__main__":
@@ -69,11 +70,11 @@ if __name__ == "__main__":
             time.sleep(sleep_time)
     times = np.arange(0,DURATION, INTERVAL)
     plt.figure(figsize=(8,5))
-    energies /= np.argmax(energies)
-    plt.plot(times,energies, marker='o')
+    plt.plot(times,energies/np.max(energies), marker='o')
     plt.xlabel('Time [s]')
     plt.ylabel('Received energy')
     plt.title("energy vs time")
     plt.grid(True)
     plt.show()
     stop_tx()
+    sdr = None
