@@ -1,6 +1,6 @@
 import time, adi, threading
 import numpy as np
-from config import FREQ, BASE_BAND, SAMP_RATE 
+from config import FREQ, BASE_BAND, SAMP_RATE,BUFFER_SIZE 
 
 # --- Connect to PlutoSDR ---
 sdr = adi.Pluto("ip:192.168.2.1")
@@ -9,7 +9,7 @@ sdr = adi.Pluto("ip:192.168.2.1")
 sdr.tx_lo = int(FREQ)                    # RF carrier in Hz
 sdr.tx_sample_rate = int(SAMP_RATE)
 sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband BW
-sdr.tx_hardwaregain_chan0 = -10          # adjust amplitude to avoid clipping
+sdr.tx_hardwaregain_chan0 = -4          # adjust amplitude to avoid clipping
 sdr.tx_cyclic_buffer = True
 # --- RX setup ---
 sdr.rx_lo = int(FREQ)                     # RF carrier in Hz
@@ -17,17 +17,20 @@ sdr.rx_sample_rate = int(SAMP_RATE)
 sdr.rx_rf_bandwidth = int(SAMP_RATE)
 sdr.gain_control_mode_chan0 = "manual"
 sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
+sdr.rx_buffer_size = BUFFER_SIZE 
 
 # --- Tone generator ---
+#we use a cylic buffer so the duration doesn't really matter.
 BURST_DURATION = 0.001 #seconds
 num_samples = int(BURST_DURATION * SAMP_RATE)
 TONE = 0.5 * np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
 TONE = TONE.astype(np.complex64)
-sdr.rx_buffer_size = len(TONE)
 
 def continuous_tx():
     sdr.tx(TONE)
 
+def stop_tx():
+    sdr.tx_destroy_buffer()
 # --- Send burst and measure energy ---
 def get_energy() -> float:
     """
@@ -35,7 +38,6 @@ def get_energy() -> float:
     """
     # Receive
     rx_data = sdr.rx()
-    
     # Compute energy
     energy = np.sum(np.abs(rx_data)**2)
     
@@ -72,4 +74,4 @@ if __name__ == "__main__":
     plt.grid(True)
     plt.show()
     sdr.tx_destroy_buffer()
-    sdr = None
+    sdr= None

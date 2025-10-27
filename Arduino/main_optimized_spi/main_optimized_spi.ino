@@ -77,6 +77,6 @@ void sendControlWord(uint16_t word) {
 
   // Pulse LE (latch enable)
   *le_port |= le_bit;  // LE high
-  asm volatile ("nop\n\t""nop\n\t""nop\n\t"); // tiny delay to meet tLE timing
+  asm volatile ("nop\n\t""nop\n\t"); // tiny delay to meet tLE timing
   *le_port &= ~le_bit; // LE low
 }

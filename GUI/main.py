@@ -24,14 +24,15 @@
 ===============================================================================
 """
 #import all necessary libraries
-import time, serial, struct, serial.tools.list_ports,json,threading
+import time, serial, struct, serial.tools.list_ports,json
 from nicegui import ui
 import numpy as np 
 from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE  
+import matplotlib.pyplot as plt
 import asyncio
 from AF_Calc import runAF_Calc
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, continuous_tx
+from PLUTO import get_energy, continuous_tx, stop_tx
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
@@ -470,7 +471,6 @@ def beam_page():
 
     @ui.page('/receive_mode')
     def receive_mode():        
-
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
@@ -492,44 +492,66 @@ def beam_page():
             with ui.row().classes('w-full justify-center items-center'): 
                 ui.label('The coefficients are precomputed for the default array')\
                 .classes('text-base text-gray-600 text-center')
-                ui.button('Start', on_click=Scan_Beam)
         image_container = ui.row()\
             .classes('w-full justify-center items-center')\
             .style('order:2;')
             
+
+
         def Scan_Beam():
-            '''
-            Scan through all combinations of theta and phi then report the direction
-            of arival as a magnitude plot with a peak in the best link direction 
-            Uses a precomputed search grid and iterates through it
+            """Launches beam scan in background with progress bar"""
+            with ui.dialog() as dialog, ui.card():
+                label = ui.label('Starting beam scan...')
+                progress_bar = ui.linear_progress(show_value = False)\
+                    .props('indeterminate')
+                dialog.open()
+
             
-            Creates and displays heatmap plot:
-            '''
-            #start tx thread
-            tx_thread = threading.Thread(target=continuous_tx, daemon=True)
-            tx_thread.start()
-            n_steps = len(DEFAULT_RX_GRID)
-            energies = np.zeros(n_steps)
-            for i, phases in enumerate(DEFAULT_RX_GRID):
-                send_phases(phases)
-                #might have to wait for phase to stabalize?
-                energies[i] = get_energy()
-            
-            #Reshape energies for heat mpat
-            energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE)) 
-            
-            plt.figure(figsize=(8,6))
-            plt.imshow(energies_2D, extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],origin='lower', aspect='auto', cmap='hot')
-            plt.colorbar(label='Received energy')
-            plt.xlabel('Phi [deg]')
-            plt.ylabel('Theta [deg]')
-            plt.title('Beam scan - received energy vs steering angles')
-            plt.savefig('rx_heat.png',dpi=300)
-             
-            image_container.clear() #remove any existing images
-            with image_container:
-                ui.image('media/rx_heat.png').style('width:65%;').force_reload()
-        #----Receive Mode page----
+            async def scan_task():
+                # Launch the scan as an async background task
+                continuous_tx()
+                n_steps = len(DEFAULT_RX_GRID)
+                energies = np.zeros(n_steps)
+
+                for i, phases in enumerate(DEFAULT_RX_GRID):
+                    send_phases(phases)
+                    #takes about 147us to latch all and settle give it 200us to be safe
+                    await asyncio.sleep(200e-6)  # allow phase to stabilize / UI refresh
+                    energies[i] = get_energy() #time to sample ~410us
+                    label.set_text(f"Scanning {i+1}/{n_steps}")
+
+                stop_tx()
+
+                # Reshape and plot
+                energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
+                plt.figure(figsize=(8, 6))
+                plt.imshow(
+                    energies_2D,
+                    extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],
+                    origin='lower', 
+                    aspect='auto', 
+                    cmap='plasma'
+                )
+                plt.colorbar(label='Received energy')
+                plt.xlabel('Phi [deg]')
+                plt.ylabel('Theta [deg]')
+                plt.title('Beam scan - received energy vs steering angles')
+                plt.savefig('media/rx_heat.png', dpi=300)
+                plt.close()
+
+                # Update UI with plot
+                image_container.clear()
+                with image_container:
+                    ui.image('media/rx_heat.png').style('width:65%;').force_reload()
+
+                # Hide progress bar after completion
+                dialog.close()
+
+            asyncio.create_task(scan_task()) 
+        ui.button('Start', on_click=Scan_Beam)
+
+
+    #----Receive Mode page----
 
 
 

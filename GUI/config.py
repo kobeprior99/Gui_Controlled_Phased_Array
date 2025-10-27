@@ -21,5 +21,7 @@ PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
 #PLUTO config
 FREQ = int(2.1e9)
 BASE_BAND = 100e3
-SAMP_RATE = 10e6  # Hz
-BUFFER_SIZE = 1024
+SAMP_RATE = 5e6  # Hz
+
+#4 ms to fill buffer
+BUFFER_SIZE = 2048 
