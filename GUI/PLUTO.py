@@ -1,47 +1,51 @@
 import time, adi, threading
 import numpy as np
-from config import FREQ, BASE_BAND, SAMP_RATE,BUFFER_SIZE 
+from config import freq, base_band, samp_rate,buffer_size, num_avg
 
-# --- Connect to PlutoSDR ---
-sdr = adi.Pluto("ip:192.168.2.1")
+# --- connect to plutosdr ---
+sdr = adi.pluto("ip:192.168.2.1")
+sdr.sample_rate = int(samp_rate)
 
-# --- TX setup ---
-sdr.tx_lo = int(FREQ)                    # RF carrier in Hz
-sdr.tx_sample_rate = int(SAMP_RATE)
-sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband BW
-sdr.tx_hardwaregain_chan0 = -4          # adjust amplitude to avoid clipping
+# --- tx setup ---
+sdr.tx_rf_bandwidth = int(samp_rate)     # match baseband bw
+sdr.tx_lo = int(freq)                    # rf carrier in hz
+sdr.tx_hardwaregain_chan0 = -40          # adjust amplitude to avoid clipping
 sdr.tx_cyclic_buffer = True
-# --- RX setup ---
-sdr.rx_lo = int(FREQ)                     # RF carrier in Hz
-sdr.rx_sample_rate = int(SAMP_RATE)
-sdr.rx_rf_bandwidth = int(SAMP_RATE)
+
+# --- rx setup ---
+sdr.rx_lo = int(freq)                     # rf carrier in hz
+sdr.rx_rf_bandwidth = int(samp_rate)
 sdr.gain_control_mode_chan0 = "manual"
 sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
-sdr.rx_buffer_size = BUFFER_SIZE 
+sdr.rx_buffer_size = buffer_size 
 
-# --- Tone generator ---
+# --- tone generator ---
 #we use a cylic buffer so the duration doesn't really matter.
-BURST_DURATION = 0.001 #seconds
-num_samples = int(BURST_DURATION * SAMP_RATE)
-TONE = 0.5 * np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
-TONE = TONE.astype(np.complex64)
+burst_duration = 0.001 #seconds
+num_samples = int(burst_duration * samp_rate)
+Tone = np.exp(1j*2*np.pi*base_band*np.arange(num_samples)/samp_rate)
+Tone *= 2**14 
 
-def continuous_tx():
+def tx():
+    '''Send the tone'''
     sdr.tx(TONE)
 
 def stop_tx():
+    '''stop transmitting by deleting the buffer'''
     sdr.tx_destroy_buffer()
-# --- Send burst and measure energy ---
+
 def get_energy() -> float:
     """
-    Transmit BASE_BAND tone burst and return received energy.
+    get the tones strength
+    gives number proportional to the amplitude of the 
+    dominant frequency component
     """
-    # Receive
-    rx_data = sdr.rx()
-    # Compute energy
-    energy = np.sum(np.abs(rx_data)**2)
-    
-    return energy
+    power = 0
+    for _ in range(NUM_AVG):
+        rx = sdr.rx()
+        power+= np.mean(np.abs(rx)**2)
+    power /= NUM_AVG
+
 
 # --- Example usage ---
 if __name__ == "__main__":
@@ -50,9 +54,7 @@ if __name__ == "__main__":
     INTERVAL = 1 #seconds
     n_samples = DURATION/INTERVAL
     energies =[]
-
-    tx_thread = threading.Thread(target=continuous_tx, daemon=True)
-    tx_thread.start()
+    tx()
     #let transmit settle
     time.sleep(0.01)
     start_time = time.time()
@@ -67,11 +69,11 @@ if __name__ == "__main__":
             time.sleep(sleep_time)
     times = np.arange(0,DURATION, INTERVAL)
     plt.figure(figsize=(8,5))
+    energies /= np.argmax(energies)
     plt.plot(times,energies, marker='o')
     plt.xlabel('Time [s]')
     plt.ylabel('Received energy')
     plt.title("energy vs time")
     plt.grid(True)
     plt.show()
-    sdr.tx_destroy_buffer()
-    sdr= None
+    stop_tx()

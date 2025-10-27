@@ -25,3 +25,4 @@ SAMP_RATE = 5e6  # Hz
 
 #4 ms to fill buffer
 BUFFER_SIZE = 2048 
+NUM_AVG = 4

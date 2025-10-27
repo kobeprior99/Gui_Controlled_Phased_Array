@@ -33,6 +33,7 @@ import asyncio
 from AF_Calc import runAF_Calc
 from create_default_rx_grid import DEFAULT_RX_GRID
 from PLUTO import get_energy, continuous_tx, stop_tx
+import plotly.graph_objects as go
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
@@ -413,7 +414,6 @@ def beam_page():
     #----Transmit Mode ----
     @ui.page('/transmit_mode')
     def transmit_mode():
-        
         # Back button in the top-left
         ui.button('⬅ Back', on_click=ui.navigate.back)
         with ui.column().classes('w-full'):
@@ -432,38 +432,86 @@ def beam_page():
         
 
             with ui.row().classes('w-full justify-center items-center'):
-                dx = ui.number(label = 'dx (λ)', value=DX, min=0.1).style('width:20%')
-                dy = ui.number(label = 'dy (λ)', value=DY, min=0.1).style('width:20%')
-                theta = ui.number(label = 'Theta (degrees)', value=0, min = 0, max=90).style('width:20%')
-                phi = ui.number(label = 'Phi (degrees)', value=0, min = 0, max = 360).style('width:20%')
-                 
-            with ui.row().classes('w-full justify-center items-center'):
-                submit_button = ui.button(
-                    'Transmit',
-                    on_click=lambda: Transmit()
-                )
-            image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
+                dx = ui.number(
+                    label = 'dx (λ)',
+                    value=DX,
+                    min=0.1
+                ).style('width:20%')
 
-            def Transmit():
-                '''
-                Transmit with the main beam direction as defined by the user
-                We should also have live elements where the user can move the rx antenna 
-                to show relative magnitudes at different angles
-                '''
-                #show the user what the expected beam pattern
-                phases = runAF_Calc(dx.value,dy.value,theta.value,phi.value)
-                
-                image_container.clear() #remove any existing images
+                dy = ui.number(
+                    label = 'dy (λ)',
+                    value=DY,
+                    min=0.1
+                ).style('width:20%')
+
+                theta = ui.number(
+                    label = 'Theta (deg)',
+                    value=0,
+                    min = 0, max=90
+                ).style('width:20%')
+
+                phi = ui.number(
+                    label = 'Phi (deg)',
+                    value=0,
+                    min = 0, max = 360
+                ).style('width:20%')
+                 
+            fig = go.Figure(
+                go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
+            )
+
+            fig.update_layout(margin=dict(l=0, r=0, t=0, b=0))
+            live_plot = ui.plotly(fig).classes('w-full h-64')
+            image_container = ui.row()\
+                .classes('w-full justify-center items-center')\
+                .style('order:2;')
+            stop_event = asyncio.Event()
+            
+            def start_live_plot():
+                # Send initial phases
+                phases = runAF_Calc(dx.value, dy.value, theta.value, phi.value)
+                send_phases(phases)
+
+                # Show AF image
+                image_container.clear()
                 with image_container:
                     ui.image('media/AF.png').style('width:65%;').force_reload()
-                try: 
-                    #start transmit thread -> then sample energy with get_energy 
-                    send_phases(phases)
-                    #TODO add SDR FUNCTIONALITY and Plotting
-                except Exception as e:
-                    ui.notify(f'Failed to send phases: {e}', color = 'red')
-                else:
-                    ui.notify('Sucessfully sent phases')
+
+                # Start continuous TX
+                continuous_tx()
+
+                # Reset stop_event
+                stop_event.clear()
+
+                # Launch async update
+                asyncio.create_task(live_update())
+
+            async def live_update():
+                t_values = []
+                energy_values = []
+
+                while not stop_event.is_set():
+                    t = time.time()
+                    energy = get_energy()  # sample SDR
+
+                    t_values.append(t)
+                    energy_values.append(energy)
+
+                    # Update the figure's data
+                    fig.data[0].x = t_values
+                    fig.data[0].y = energy_values
+                    live_plot.update()  # NiceGUI triggers plot update
+
+                    await asyncio.sleep(0.05)  # ~20 Hz refresh
+
+            def stop_live():
+                stop_tx()
+                stop_event.set()
+                ui.notify("Live plot stopped", type='positive')
+
+            # Buttons
+            ui.button('Transmit & Live Plot', on_click=start_live_plot)
+            ui.button('Stop', on_click=stop_live)
     #----END transmit page----
 
 
