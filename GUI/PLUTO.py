@@ -3,30 +3,32 @@ import numpy as np
 from config import FREQ , BASE_BAND, SAMP_RATE,BUFFER_SIZE,NUM_AVG 
 
 # --- connect to plutosdr ---
-sdr = adi.Pluto("ip:192.168.2.1")
-sdr.sample_rate = int(SAMP_RATE)
+try:
+    sdr = adi.Pluto("ip:192.168.2.1")
+    sdr.sample_rate = int(SAMP_RATE)
 
 # --- tx setup ---
-sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
-sdr.tx_lo = int(FREQ)                    # rf carrier in hz
-sdr.tx_hardwaregain_chan0 = -40          # adjust amplitude to avoid clipping
-sdr.tx_cyclic_buffer = True
+    sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
+    sdr.tx_lo = int(FREQ)                    # rf carrier in hz
+    sdr.tx_hardwaregain_chan0 = -40          # adjust amplitude to avoid clipping
+    sdr.tx_cyclic_buffer = True
 
 # --- rx setup ---
-sdr.rx_lo = int(FREQ)                     # rf carrier in hz
-sdr.rx_rf_bandwidth = int(SAMP_RATE)
-sdr.gain_control_mode_chan0 = "manual"
-sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
-sdr.rx_buffer_size =  BUFFER_SIZE
+    sdr.rx_lo = int(FREQ)                     # rf carrier in hz
+    sdr.rx_rf_bandwidth = int(SAMP_RATE)
+    sdr.gain_control_mode_chan0 = "manual"
+    sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
+    sdr.rx_buffer_size =  BUFFER_SIZE
 
 # --- tone generator ---
-duration = 0.01
+    duration = 0.01
 #ensure cyclic
-num_cycles = int(BASE_BAND * duration)
-num_samples = int(num_cycles * SAMP_RATE / BASE_BAND)
-TONE= np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
-TONE *= 2**14 
-
+    num_cycles = int(BASE_BAND * duration)
+    num_samples = int(num_cycles * SAMP_RATE / BASE_BAND)
+    TONE= np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
+    TONE *= 2**14 
+except:
+    print('No PLUTO attached')
 def tx():
     '''Send the tone'''
     sdr.tx(TONE)

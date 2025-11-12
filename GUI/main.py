@@ -84,45 +84,6 @@ def use_calibration_file(filename:str):
         ui.notify(f"no calibration file: {filename}.json found")
 
 
-def gen_Cal_from_S2P(folder_path: str) -> None:
-    """
-    Computes PHASE_OFFSETS from a directory of S2P files.
-    Each S2P file is expected to contain data for one port, named Port1.s2p ... Port16.s2p.
-    The files are tab-separated and contain real/imaginary format data.
-    """
-    global PHASE_OFFSETS
-
-    FREQ = 2.1e9  # 2.1 GHz
-    phases = []
-
-    # List all .s2p files in the folder
-    s2p_files = sorted(
-        [f for f in os.listdir(folder_path) if f.lower().endswith('.s2p')],
-        key=lambda x: int(''.join(filter(str.isdigit, x)) or 0)
-    )
-
-    if len(s2p_files) != 16:
-        print(f"Warning: Expected 16 S2P files, found {len(s2p_files)}")
-    
-    for file in s2p_files:
-        path = os.path.join(folder_path, file)
-        freq, phase = get_phase_at_freq(path, FREQ)
-        phases.append(phase)
-        print(f"{file:<12} Phase @ 2.1GHz: {phase:.2f}°")
-
-    # Find the most negative phase (longest electrical length)
-    reference_phase = min(phases)
-    
-    # Compute offsets so that all phases match the reference
-    PHASE_OFFSETS = np.mod(reference_phase - np.array(phases), 360)
-
-    print("\nComputed PHASE_OFFSETS (degrees):")
-    print(PHASE_OFFSETS)
-
-    # Optional: update UI or display fields
-    update_phase_inputs()
-
-
 def get_phase_at_freq(filepath: str, FREQ: float) -> tuple[float, float]:
     """
     Parse a .s2p file and return the (frequency, phase_deg) at the closest frequency to FREQ.
@@ -162,6 +123,47 @@ def get_phase_at_freq(filepath: str, FREQ: float) -> tuple[float, float]:
     phase_deg = np.degrees(phase_rad)
 
     return freqs[idx], phase_deg
+
+def gen_Cal_from_S2P(folder_path: str) -> None:
+    """
+    Computes PHASE_OFFSETS from a directory of S2P files.
+    Each S2P file is expected to contain data for one port, named Port1.s2p ... Port16.s2p.
+    The files are tab-separated and contain real/imaginary format data.
+    """
+    global PHASE_OFFSETS
+
+    FREQ = 2.1e9  # 2.1 GHz
+    phases = []
+
+    # List all .s2p files in the folder
+    s2p_files = sorted(
+        [f for f in os.listdir(folder_path) if f.lower().endswith('.s2p')],
+        key=lambda x: int(''.join(filter(str.isdigit, x)) or 0)
+    )
+
+    if len(s2p_files) != 16:
+        print(f"Warning: Expected 16 S2P files, found {len(s2p_files)}")
+    
+    for file in s2p_files:
+        path = os.path.join(folder_path, file)
+        freq, phase = get_phase_at_freq(path, FREQ)
+        phases.append(phase)
+        #DEBUG 
+        print(f"{file:<12} Phase @ 2.1GHz: {phase:.2f}°")
+
+    # Find the most negative phase (longest electrical length)
+    reference_phase = min(phases)
+    
+    # Compute offsets so that all phases match the reference
+    PHASE_OFFSETS = np.mod(reference_phase - np.array(phases), 360)
+
+    print("\nComputed PHASE_OFFSETS (degrees):")
+    print(PHASE_OFFSETS)
+
+    # Optional: update UI or display fields
+    update_phase_inputs()
+
+
 
 SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
 async def set_com_port(port:str):
