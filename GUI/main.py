@@ -468,7 +468,7 @@ def beam_page():
             live_plot = ui.plotly(fig).classes('w-3/4 h-64')
             image_container = ui.row()\
                 .classes('justify-center items-center')\
-            .style('order:2; width:80%;')
+            .style('order:2; width:90%;')
             stop_event = asyncio.Event()
             
             
@@ -480,8 +480,9 @@ def beam_page():
                 # Show AF image
                 image_container.clear()
                 with image_container:
-                    ui.image('media/AF.png').style('width:65%;').force_reload()
 
+                    ui.image('media/AF.png').style('width:40%;').force_reload()
+                    ui.image('media/uv.png').style('width:40%;').force_reload()
                 # Start continuous TX
                 tx()
 
@@ -525,7 +526,10 @@ def beam_page():
                 image_container.clear()
                 with image_container:
                     ui.image('media/AF.png')\
-                    .style('width:65%;')\
+                    .style('width:40%;')\
+                    .force_reload()
+                    ui.image('media/uv.png')\
+                    .style('width:40%;')\
                     .force_reload()
 
             def stop_live():

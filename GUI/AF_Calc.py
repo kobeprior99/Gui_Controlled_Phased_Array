@@ -90,6 +90,7 @@ def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     -------
     none
     plots the array factor magnitude 
+    plot uv
     '''
     # define theta phi mesh grid 
     theta = np.linspace(0, np.pi/2, 300)
@@ -116,7 +117,7 @@ def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     X = AF_mag_norm * sinTH * cosPH
     Y = AF_mag_norm * sinTH * sinPH
     Z = AF_mag_norm * np.cos(THETA)
-    fig = plt.figure(figsize=(9,7))
+    fig = plt.figure(figsize = (9,7))
     ax = fig.add_subplot(111, projection='3d')  
     cmap = cm.jet
     custom_cmap = ListedColormap(cmap(np.linspace(0.3, 1, 256)))
@@ -139,6 +140,7 @@ def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     ax.set_zlim(0,1)
     ax.set_box_aspect([1,1,1])
     ax.set_axis_off()
+
     #Redraw Custon Axes through the origin
     #X
     ax.plot([-1,1], [0,0], [0,0], color = 'k', lw=2)
@@ -153,10 +155,34 @@ def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     ax.grid(True, linestyle = '--', linewidth = 0.5)
     ax.set_title('Normalized Array Factor (Spherical Format)', pad=20)
     ax.view_init(elev=25, azim=30)
-    # ax.dist = 9
-
     if not disp:
         plt.savefig('media/AF.png', bbox_inches='tight', dpi = 300)
+    else:
+        plt.show()
+    # ax.dist = 9
+    u=sinTH*cosPH
+    v=sinTH*sinPH
+    fig_uv, ax_uv= plt.subplots( figsize=(7,6))
+    uv_plot = ax_uv.pcolormesh(
+        u, v, AF_mag_norm,
+        shading='auto',
+        cmap=custom_cmap
+    )
+
+    cbar_uv = plt.colorbar(uv_plot, ax=ax_uv)
+    cbar_uv.set_label('Normalized Array Factor (linear scale)', fontsize=10)
+
+    ax_uv.set_xlabel('u = sin(θ)cos(φ)')
+    ax_uv.set_ylabel('v = sin(θ)sin(φ)')
+    ax_uv.set_title('Normalized Array Factor (UV Plot)')
+    ax_uv.set_aspect('equal', adjustable='box')
+    ax_uv.set_xlim(-1, 1)
+    ax_uv.set_ylim(-1, 1)
+    ax_uv.grid(True, linestyle='--', linewidth=0.5)
+
+    if not disp:
+        plt.savefig('media/uv.png', bbox_inches='tight', dpi=300)
+        plt.close(fig_uv)
     else:
         plt.show()
 
