@@ -27,7 +27,7 @@
 import time, serial, struct, serial.tools.list_ports,json
 from nicegui import ui
 import numpy as np 
-from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE  
+from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ  
 import matplotlib.pyplot as plt
 import asyncio
 from AF_Calc import runAF_Calc
@@ -83,6 +83,85 @@ def use_calibration_file(filename:str):
     except FileNotFoundError:
         ui.notify(f"no calibration file: {filename}.json found")
 
+
+def gen_Cal_from_S2P(folder_path: str) -> None:
+    """
+    Computes PHASE_OFFSETS from a directory of S2P files.
+    Each S2P file is expected to contain data for one port, named Port1.s2p ... Port16.s2p.
+    The files are tab-separated and contain real/imaginary format data.
+    """
+    global PHASE_OFFSETS
+
+    FREQ = 2.1e9  # 2.1 GHz
+    phases = []
+
+    # List all .s2p files in the folder
+    s2p_files = sorted(
+        [f for f in os.listdir(folder_path) if f.lower().endswith('.s2p')],
+        key=lambda x: int(''.join(filter(str.isdigit, x)) or 0)
+    )
+
+    if len(s2p_files) != 16:
+        print(f"Warning: Expected 16 S2P files, found {len(s2p_files)}")
+    
+    for file in s2p_files:
+        path = os.path.join(folder_path, file)
+        freq, phase = get_phase_at_freq(path, FREQ)
+        phases.append(phase)
+        print(f"{file:<12} Phase @ 2.1GHz: {phase:.2f}°")
+
+    # Find the most negative phase (longest electrical length)
+    reference_phase = min(phases)
+    
+    # Compute offsets so that all phases match the reference
+    PHASE_OFFSETS = np.mod(reference_phase - np.array(phases), 360)
+
+    print("\nComputed PHASE_OFFSETS (degrees):")
+    print(PHASE_OFFSETS)
+
+    # Optional: update UI or display fields
+    update_phase_inputs()
+
+
+def get_phase_at_freq(filepath: str, FREQ: float) -> tuple[float, float]:
+    """
+    Parse a .s2p file and return the (frequency, phase_deg) at the closest frequency to FREQ.
+    Assumes real/imag format and tab-separated columns.
+    """
+    freqs = []
+    s21_real = []
+    s21_imag = []
+
+    with open(filepath, 'r') as f:
+        for line in f:
+            # Skip comments or header lines starting with '!' or '#'
+            if line.strip().startswith(('!', '#')) or not line.strip():
+                continue
+            parts = line.strip().split()
+            if len(parts) < 9:
+                continue  # not a valid data line
+            try:
+                freq = float(parts[0])
+                r21 = float(parts[3])
+                i21 = float(parts[4])
+                freqs.append(freq)
+                s21_real.append(r21)
+                s21_imag.append(i21)
+            except ValueError:
+                continue  # skip lines with invalid numbers
+
+    freqs = np.array(freqs)
+    s21_real = np.array(s21_real)
+    s21_imag = np.array(s21_imag)
+
+    # Find the index of the frequency closest to 2.1 GHz
+    idx = np.argmin(np.abs(freqs - FREQ))
+
+    # Compute phase in degrees
+    phase_rad = np.arctan2(s21_imag[idx], s21_real[idx])
+    phase_deg = np.degrees(phase_rad)
+
+    return freqs[idx], phase_deg
 
 SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
 async def set_com_port(port:str):
@@ -697,6 +776,7 @@ def calibrate():
     with ui.row().classes('justify-center gap-4 my-2'):
         ui.button('Save Calibration', on_click=prompt_save_calibration)
         ui.button('Load Calibration', on_click=prompt_use_calibration)
+        ui.button('Generate Calibration from S2P Folder', on_click=gen_Cal_from_S2P)
     #clear so we don't get more than 16 in phase_inputs
     phase_inputs.clear()
     # Display inputs in a 4x4 grid
