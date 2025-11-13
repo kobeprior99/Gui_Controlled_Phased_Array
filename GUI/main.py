@@ -24,13 +24,14 @@
 ===============================================================================
 """
 #import all necessary libraries
-import time, serial, struct, serial.tools.list_ports,json
+import time, serial, struct, serial.tools.list_ports,json,os
 from nicegui import ui
 import numpy as np 
 from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ  
 import matplotlib.pyplot as plt
 import asyncio
 from AF_Calc import runAF_Calc
+from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
 from PLUTO import get_energy, tx, stop_tx
 import plotly.graph_objects as go
@@ -84,83 +85,24 @@ def use_calibration_file(filename:str):
         ui.notify(f"no calibration file: {filename}.json found")
 
 
-def get_phase_at_freq(filepath: str, FREQ: float) -> tuple[float, float]:
-    """
-    Parse a .s2p file and return the (frequency, phase_deg) at the closest frequency to FREQ.
-    Assumes real/imag format and tab-separated columns.
-    """
-    freqs = []
-    s21_real = []
-    s21_imag = []
-
-    with open(filepath, 'r') as f:
-        for line in f:
-            # Skip comments or header lines starting with '!' or '#'
-            if line.strip().startswith(('!', '#')) or not line.strip():
-                continue
-            parts = line.strip().split()
-            if len(parts) < 9:
-                continue  # not a valid data line
-            try:
-                freq = float(parts[0])
-                r21 = float(parts[3])
-                i21 = float(parts[4])
-                freqs.append(freq)
-                s21_real.append(r21)
-                s21_imag.append(i21)
-            except ValueError:
-                continue  # skip lines with invalid numbers
-
-    freqs = np.array(freqs)
-    s21_real = np.array(s21_real)
-    s21_imag = np.array(s21_imag)
-
-    # Find the index of the frequency closest to 2.1 GHz
-    idx = np.argmin(np.abs(freqs - FREQ))
-
-    # Compute phase in degrees
-    phase_rad = np.arctan2(s21_imag[idx], s21_real[idx])
-    phase_deg = np.degrees(phase_rad)
-
-    return freqs[idx], phase_deg
-
-def gen_Cal_from_S2P(folder_path: str) -> None:
+def gen_Cal_from_S2P() -> None:
     """
     Computes PHASE_OFFSETS from a directory of S2P files.
-    Each S2P file is expected to contain data for one port, named Port1.s2p ... Port16.s2p.
-    The files are tab-separated and contain real/imaginary format data.
+    Use helper function from READ_S2P module
+    Find the most negative phase and make that the reference
     """
     global PHASE_OFFSETS
-
-    FREQ = 2.1e9  # 2.1 GHz
-    phases = []
-
-    # List all .s2p files in the folder
-    s2p_files = sorted(
-        [f for f in os.listdir(folder_path) if f.lower().endswith('.s2p')],
-        key=lambda x: int(''.join(filter(str.isdigit, x)) or 0)
-    )
-
-    if len(s2p_files) != 16:
-        print(f"Warning: Expected 16 S2P files, found {len(s2p_files)}")
-    
-    for file in s2p_files:
-        path = os.path.join(folder_path, file)
-        freq, phase = get_phase_at_freq(path, FREQ)
-        phases.append(phase)
-        #DEBUG 
-        print(f"{file:<12} Phase @ 2.1GHz: {phase:.2f}°")
-
-    # Find the most negative phase (longest electrical length)
-    reference_phase = min(phases)
-    
-    # Compute offsets so that all phases match the reference
-    PHASE_OFFSETS = np.mod(reference_phase - np.array(phases), 360)
-
-    print("\nComputed PHASE_OFFSETS (degrees):")
-    print(PHASE_OFFSETS)
-
-    # Optional: update UI or display fields
+    #numpy array of phases at FREQ for each port 
+    phases = get_phase_at_freq()
+    #ref phase is the longest port (most negative phase):
+    ref_phase = np.min(phases)  
+    #if its the ref phase the offset should be 0:
+    #ref_phase - ref_phase = 0 
+    #the other phases are less negative than ref phase
+    #portx_phase - ref_phase = positive check  
+    PHASE_OFFSETS = (phases - ref_phase)
+    ui.notify("Phase offsets computed and applied")
+    # update UI or display fields
     update_phase_inputs()
 
 
@@ -189,7 +131,7 @@ def send_phases(phases: np.ndarray):
     #scales degrees 0-360 to phase_words 0-255
     #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
     #adding 0.5 ensures when type conversion happens we round to the nearest integer instead of truncating
-    hardware_phases = np.uint8(((phases - PHASE_OFFSETS) * (255/360)) + 0.5)
+    hardware_phases = np.uint8(((phases + PHASE_OFFSETS) * (255/360)) + 0.5)
     #send the phases
     ser.write(hardware_phases.tobytes()) 
 
@@ -747,8 +689,8 @@ def calibrate():
                 .classes('text-2xl font-bold text-center')
         with ui.row().classes('w-full justify-center items-center'):
             ui.label('The phase of each shifter is set to 0°.').classes('text-base text-gray-600 text-center')
-            ui.label('Please connect the phase shifting network with to a VNA: Port 1 -> RFin and Port 2 ->  one of the 16 output ports.').classes('text-base text-gray-600 text-center')
-            
+            ui.label('Please Load Defualt Calibration File by clicking load calibration and typing Default').classes('text-base text-gray-600 text-center')
+            ui.label('If recalibration is needed please manually enter phases and save or redo s2p measurements for each port and create the new calibration').classes('text-base text-gray-600 text-center')
             ui.label('Enter the phase (in degrees) from the S21 measurement for each port.').classes('text-base text-gray-600 text-center')
             
     def prompt_save_calibration():
