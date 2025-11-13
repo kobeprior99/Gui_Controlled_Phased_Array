@@ -19,12 +19,12 @@ from pathlib import Path
 
 S2P_DIR = Path("S2P") #directory containing port data
 
+
 def read_s2p(filepath: Path):
     """
     Read S-parameter data from a .s2p file.
-    Retunrs freqs s11 and s41
+    Returns freqs, s11, s41, s44
     """
-
     data = []
     with open(filepath, "r") as f:
         for line in f:
@@ -35,12 +35,14 @@ def read_s2p(filepath: Path):
             # Columns: Freq, S11 Re/Im, S41 Re/Im, S14 Re/Im, S44 Re/Im
             s11 = complex(float(parts[1]), float(parts[2]))
             s41 = complex(float(parts[3]), float(parts[4]))
-            data.append((freq, s11, s41))
+            s44 = complex(float(parts[7]), float(parts[8]))
+            data.append((freq, s11, s41, s44))
     data = np.array(data, dtype=object)
     freqs = np.array([d[0] for d in data])
     s11 = np.array([d[1] for d in data])
     s41 = np.array([d[2] for d in data])
-    return freqs, s11, s41
+    s44 = np.array([d[3] for d in data])
+    return freqs, s11, s41, s44
 
 
 def get_phase_at_freq() -> np.ndarray:
@@ -51,7 +53,7 @@ def get_phase_at_freq() -> np.ndarray:
     phases = []
     for i in range(1, 17):
         file = S2P_DIR / f"Port{i}.s2p"
-        freqs, _, s41 = read_s2p(file)
+        freqs, _, s41, _ = read_s2p(file)
         # Find the closest frequency index
         idx = np.argmin(np.abs(freqs - FREQ))
         phase_deg = np.angle(s41[idx], deg=True)
@@ -66,7 +68,7 @@ def plot_S41_mag():
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
         file = S2P_DIR / f"Port{i}.s2p"
-        freqs, _, s41 = read_s2p(file)
+        freqs, _, s41, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s41))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
     plt.xlabel("Frequency (GHz)")
@@ -83,7 +85,7 @@ def plot_S41_phase(unwrap=True):
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
         file = S2P_DIR / f"Port{i}.s2p"
-        freqs, _, s41 = read_s2p(file)
+        freqs, _, s41, _ = read_s2p(file)
         phase_deg = np.angle(s41, deg=True)
         if unwrap:
             phase_deg = np.unwrap(np.angle(s41)) * 180 / np.pi
@@ -102,7 +104,7 @@ def plot_S11_mag():
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
         file = S2P_DIR / f"Port{i}.s2p"
-        freqs, s11, _ = read_s2p(file)
+        freqs, s11, _, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s11))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
     plt.xlabel("Frequency (GHz)")
@@ -113,14 +115,31 @@ def plot_S11_mag():
     plt.tight_layout()
     plt.show()
 
-    
+
+def plot_S44_mag():
+    '''Plot |S44| (in dB) for each port on the same graph'''
+    plt.figure(figsize=(10, 6))
+    for i in range(1, 17):
+        file = S2P_DIR / f"Port{i}.s2p"
+        freqs, _, _, s44 = read_s2p(file)
+        mag_db = 20 * np.log10(np.abs(s44))
+        plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
+    plt.xlabel("Frequency (GHz)")
+    plt.ylabel("|S44| (dB)")
+    plt.title("S44 Magnitude (dB) for Each Port")
+    plt.grid(True)
+    plt.legend(ncol=4, fontsize=8)
+    plt.tight_layout()
+    plt.show()
+
+
 def main():
-    #For testing purposes
+    # For testing purposes
     plot_S11_mag()
     plot_S41_mag()
+    plot_S44_mag()
     plot_S41_phase()
 
 
-#if running this program directly plot S41 -> for each port
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

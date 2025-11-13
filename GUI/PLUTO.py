@@ -1,6 +1,6 @@
 import time, adi 
 import numpy as np
-from config import FREQ , BASE_BAND, SAMP_RATE,BUFFER_SIZE,NUM_AVG 
+from config import FREQ , BASE_BAND, SAMP_RATE,BUFFER_SIZE,NUM_AVG,RX_GAIN,TX_GAIN 
 
 # --- connect to plutosdr ---
 try:
@@ -10,14 +10,14 @@ try:
 # --- tx setup ---
     sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
     sdr.tx_lo = int(FREQ)                    # rf carrier in hz
-    sdr.tx_hardwaregain_chan0 = -40          # adjust amplitude to avoid clipping
+    sdr.tx_hardwaregain_chan0 = TX_GAIN          #dBm 
     sdr.tx_cyclic_buffer = True
 
 # --- rx setup ---
     sdr.rx_lo = int(FREQ)                     # rf carrier in hz
     sdr.rx_rf_bandwidth = int(SAMP_RATE)
     sdr.gain_control_mode_chan0 = "manual"
-    sdr.rx_hardwaregain_chan0 = 0             # adjust as needed
+    sdr.rx_hardwaregain_chan0 = RX_GAIN             # adjust as needed
     sdr.rx_buffer_size =  BUFFER_SIZE
 
 # --- tone generator ---
