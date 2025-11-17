@@ -29,6 +29,7 @@ from nicegui import ui
 import numpy as np 
 from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ  
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle 
 import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
@@ -633,22 +634,46 @@ def beam_page():
 
                 # Reshape and plot
                 energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
-                energies_2D /= np.max(energies_2D)#normalize
-                plt.figure(figsize=(8, 6))
-                plt.imshow(
+                energies_2D /= np.max(energies_2D) #normalize
+                # Find peak location
+                peak_idx = np.unravel_index(np.argmax(energies_2D), energies_2D.shape)
+                theta_peak = THETA_RANGE[peak_idx[0]]
+                phi_peak = PHI_RANGE[peak_idx[1]]
+
+                r=3#circle radius
+
+                fig, ax = plt.subplots(figsize=(8, 6))
+
+                im = ax.imshow(
                     energies_2D,
                     extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],
-                    origin='lower', 
-                    aspect='auto', 
+                    origin='lower',
+                    aspect='auto',
                     cmap='plasma'
                 )
-                plt.colorbar(label='Received energy')
-                plt.xlabel('Phi [deg]')
-                plt.ylabel('Theta [deg]')
-                plt.title('Beam scan - normalized received energy vs steering angles')
+
+                #mark the point                
+                ax.plot(phi_peak, theta_peak, 'ro', markersize=10)  # Mark peak
+                # Annotate with coordinates
+                ax.annotate(
+                    fr"$\phi$: {phi_peak:.1f}°,$\theta$: {theta_peak:.1f}°",
+                    xy=(phi_peak, theta_peak),                 # point to annotate
+                    xytext=(0, 10),                           # offset in pixels
+                    ha='center',
+                    va='center',
+                    textcoords='offset points',
+                    color='white',
+                    fontsize=10,
+                    bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
+                    zorder=100
+                )
+                plt.colorbar(im, ax=ax, label='Received energy')
+
+                ax.set_xlabel('Phi [deg]')
+                ax.set_ylabel('Theta [deg]')
+                ax.set_title('Beam Scan')
                 plt.savefig('media/rx_heat.png', dpi=300)
                 plt.close()
-
                 # Update UI with plot
                 image_container.clear()
                 with image_container:
