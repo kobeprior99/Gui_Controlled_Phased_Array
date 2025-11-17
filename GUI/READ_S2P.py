@@ -80,22 +80,57 @@ def plot_S41_mag():
     plt.show()
 
 
-def plot_S41_phase(unwrap=True):
+def plot_S41_phase(unwrap=True, interactive=False):
     '''Plot the S41 phase (degrees) for each port on the same graph'''
+    lines = [] #store line handles 
+    labels = [] #store label strings
     plt.figure(figsize=(10, 6))
+
     for i in range(1, 17):
         file = S2P_DIR / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
         phase_deg = np.angle(s41, deg=True)
         if unwrap:
             phase_deg = np.unwrap(np.angle(s41)) * 180 / np.pi
-        plt.plot(freqs / 1e9, phase_deg, label=f"Port {i}")
+        line, = plt.plot(freqs / 1e9, phase_deg, label=f"Port {i}")
+        lines.append(line)
+        labels.append(f"Port {i}")
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("Phase (degrees)")
     plt.title("S41 Phase for Each Port" + (" (Unwrapped)" if unwrap else ""))
     plt.grid(True)
-    plt.legend(ncol=4, fontsize=8)
+    leg = plt.legend(ncol=4, fontsize=8,fancybox=True, shadow=False)
     plt.tight_layout()
+    if interactive:
+        # --- Create legend with picking enabled ---
+        leg = plt.legend(ncol=4, fontsize=8, fancybox=True, shadow=False)
+        for legend_line in leg.get_lines():
+            legend_line.set_picker(True)        # make clickable
+            legend_line.set_pickradius(5)
+
+        # --- Click event handler ---
+        def on_pick(event):
+            legend_line = event.artist
+            label = legend_line.get_label()
+
+            # Find which port index
+            index = labels.index(label)
+
+            # Highlight selected, dim others
+            for idx, line in enumerate(lines):
+                if idx == index:
+                    line.set_linewidth(3.0)
+                    line.set_alpha(1.0)
+                    line.set_zorder(3)
+                else:
+                    line.set_linewidth(1.0)
+                    line.set_alpha(0.25)
+                    line.set_zorder(1)
+
+            plt.draw()
+
+        # Connect event
+        plt.gcf().canvas.mpl_connect('pick_event', on_pick)
     plt.show()
 
 
@@ -138,7 +173,7 @@ def main():
     plot_S11_mag()
     plot_S41_mag()
     plot_S44_mag()
-    plot_S41_phase()
+    plot_S41_phase(unwrap=True, interactive = True)
 
 
 if __name__ == '__main__':
