@@ -136,9 +136,6 @@ def send_phases(phases: np.ndarray):
     #send the phases
     ser.write(hardware_phases.tobytes()) 
 
-
-
-
 # ---- LANDING PAGE ----
 @ui.page('/')
 def main_page():
@@ -362,6 +359,15 @@ def hermite_page():
         with ui.row().classes('w-full justify-center items-center'):
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
+
+    #TODO create two Buttons
+    with ui.row().classes('w-full justify-center items-center'):
+        ui.button('Continuous Transmission', on_click=lambda: ui.navigate.to('/continuous_tx')).\
+        classes('w-64 h-24 text-xl')
+        ui.button('Scattering Experiment', on_click=lambda: ui.navigate.to('/scattering_experiment')).\
+        classes('w-64 h-24 text-xl')
+    
+
 
     images = [
     ('01', '01.png'), 
