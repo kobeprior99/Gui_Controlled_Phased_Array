@@ -1,7 +1,7 @@
 import time, adi 
 import numpy as np
 from config import FREQ , BASE_BAND, SAMP_RATE,BUFFER_SIZE,NUM_AVG,RX_GAIN,TX_GAIN 
-
+TX_ACTIVE = False
 # --- connect to plutosdr ---
 try:
     sdr = adi.Pluto("ip:192.168.2.1")
@@ -25,17 +25,22 @@ try:
 #ensure cyclic
     num_cycles = int(BASE_BAND * duration)
     num_samples = int(num_cycles * SAMP_RATE / BASE_BAND)
-    TONE= np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
-    TONE *= 2**14 
+    TONE = np.exp(1j*2*np.pi*BASE_BAND*np.arange(num_samples)/SAMP_RATE)
+
+    TONE *= 2**14 #required by PLUTO 
 except:
     print('No PLUTO attached')
 def tx():
     '''Send the tone'''
     sdr.tx(TONE)
+    TX_ACTIVE=True
 
 def stop_tx():
     '''stop transmitting by deleting the buffer'''
-    sdr.tx_destroy_buffer()
+    #check if tx is active though 
+    if TX_ACTIVE == True:
+        sdr.tx_destroy_buffer()
+        tx_active=False
 
 def get_energy() -> float:
     """

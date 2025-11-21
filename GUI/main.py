@@ -34,7 +34,7 @@ import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, tx, stop_tx
+from PLUTO import get_energy, tx, stop_tx, TX_ACTIVE
 import plotly.graph_objects as go
 #global serial handler
 ser = None
@@ -45,6 +45,9 @@ PHASE_CORRECTED = False
 #store reference to phase_input number boxes
 phase_inputs = [] 
 
+
+
+#----HELPER FUNCTIONS----
 def update_phase(index:int, value:int):
     global PHASE_CORRECTED, PHASE_OFFSETS
     if value is None or value == '':
@@ -136,6 +139,101 @@ def send_phases(phases: np.ndarray):
     #send the phases
     ser.write(hardware_phases.tobytes()) 
 
+
+def hermite_mode(mode:str):
+    '''
+    Sends the appropriate phases to generate hermite gaussian beam 
+    Args: 
+        mode (str) - requested hermite mode
+    ''' 
+    if mode == '01':
+        '''
+        mode 01 
+        top 8 elements 0 degrees
+        bottom 8 elements 180 degrees
+        '''
+        phases = np.array(
+            [0,0,0,0,0,0,0,0,180,180,180,180,180,180,180,180
+        ])
+    elif mode == '10':
+        '''
+        mode 10
+        left 8 elements 0 degrees
+        right 8 elements 180 degrees
+        '''
+        phases = np.array(
+            [0,0,180,180,0,0,180,180,0,0,180,180,0,0,180,180
+        ])
+    else:
+        '''
+        mode 11
+        top-left 4 elements 0 degrees
+        top-right 4 elements 180 degrees
+        bottom-left 4 elements 180 degrees
+        bottom-right 4 elements 0 degrees
+        '''
+        phases = np.array([
+            0,0,180,180,0,0,180,180,180,180,0,0,180,180,0,0
+        ]) 
+
+    try: 
+        send_phases(phases)
+    except Exception as e:
+        ui.notify(f'Failed to send phases: {e}', color = 'red')
+    else:
+        ui.notify('Sucessfully sent phases')
+
+def oam_mode(mode: str):
+    '''
+    sends appropriate phases to generate oam beam
+    Args: 
+        mode(str): e.g. '-1' or '2'
+    '''
+    #default oam_1
+    phases = np.array([
+        140.2, 111.8, 68.2, 39.8, 164.5, 140.2, 39.8, 15.5, 195.5, 219.8, 320.2, 344.5, 219.8, 248.2, 291.8,320.2 
+    ]) 
+    if mode == '-3':
+        phases *= -3
+
+    if mode == '-2':
+        #Mode =-2 
+        phases *= -2
+
+    elif mode == '-1':
+        #Mode = -1
+        phases *= -1
+
+    elif mode == '1':
+        #OAM mode 1
+        pass 
+    elif mode =='2':
+        # Mode 2 
+        phases *= 2
+
+    else:
+        #Mode = 3
+        phases *= 3
+
+    #send the appropriate phase
+    try: 
+        send_phases(phases)
+    except Exception as e:
+        ui.notify(f'Failed to send phases: {e}', color = 'red')
+    else:
+        ui.notify('Sucessfully sent phases')
+
+def nav_back():
+    '''
+    navigate back and terminate transmission iff applicable
+    ''' 
+    stop_tx() #this checks if tx is active before terminating 
+    ui.navigate.back()
+
+#----END HELPER FUNCTIONS----
+   
+
+
 # ---- LANDING PAGE ----
 @ui.page('/')
 def main_page():
@@ -226,9 +324,9 @@ def manual_page():
 
         # Instructions
         ui.label(
-            'Enter the phase in degrees (0–360) for each element. '
-            'Select Arduino Port from drop down menu'
-            'Unused elements should remain at 0.'
+            '''Enter the phase in degrees (0–360) for each element. 
+            Select Arduino Port from drop down menu. 
+            Unused elements should remain at 0.'''
         ).classes('text-base text-gray-600 text-center')
         # Sliders in two columns
         sliders = []
@@ -273,74 +371,47 @@ def manual_page():
 #----OAM PAGE ----
 @ui.page('/oam')
 def oam_page():
-    ui.button('⬅ Back', on_click = ui.navigate.back)
-    # Main content centered horizontally
+    ui.button('⬅ Back', on_click=nav_back)
+
     with ui.column().classes('w-full items-center  gap-6 mt-6'):
         # Header
-        ui.label('Generate OAM Beams') \
+        ui.label('Generate Laguerre Guassian Beams') \
             .classes('text-2xl font-bold text-center')
 
         # Instructions
         ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
         with ui.row().classes('w-full justify-center items-center'):
-            ui.image('media/Default_Array_OAM.png').style('width: 35%;')
-        ui.label('Create a Psuedo Circular Array by only attaching the highlighted elements').classes('text-base text-gray-600 text-center')
+            ui.image('media/Default_Array.png').style('width: 35%;')
+            ui.image('media/Default_Array2.png').style('width: 35%;')
 
-    
-    images = [
-    ('-3', 'oam-3.png'),
-    ('-2', 'oam-2.png'), 
-    ('-1', 'oam-1.png'),
-    ('1', 'oam1.png'),
-    ('2', 'oam2.png'),
-    ('3', 'oam3.png')
-    ]
+    #TODO create two Buttons
+    with ui.row().classes('w-full justify-center items-center'):
+        ui.button('Measure Only', on_click=lambda: ui.navigate.to('/measure')).\
+        classes('w-64 h-24 text-xl')
+        ui.button('Scattering Experiment', on_click=lambda: ui.navigate.to('/scattering_experiment')).\
+        classes('w-64 h-24 text-xl')
 
-    with ui.row().classes('w-full justify-center items-center gap-4'):
-        for target, filename in images:
-            ui.image(f'media/{filename}')\
-                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda t=target: oam_mode(t))
+    @ui.page(\measure)
+    def measure(): 
+        ui.button('⬅ Back', on_click=nav_back)
+        with ui.column().classes('w-full items-center  gap-6 mt-6'):
+            ui.label('Select your desired mode.').classes('text-base text-gray-600 text-center')
+            ui.label('Phases are applied to ports appropriatly.').classes('text-base text-gray-600 text-center')
+            ui.label('Energize the input port and measure.').classes('text-base text-gray-600 text-center')
+        images = [
+        ('-3', 'oam-3.png'),
+        ('-2', 'oam-2.png'), 
+        ('-1', 'oam-1.png'),
+        ('1', 'oam1.png'),
+        ('2', 'oam2.png'),
+        ('3', 'oam3.png')
+        ]
 
-        def oam_mode(mode: str):
-            '''
-            sends appropriate phases to generate oam beam
-            Args: 
-                mode(str): e.g. '-1' or '2'
-            '''
-            #default oam_1
-            phases = np.array([
-                140.2, 111.8, 68.2, 39.8, 164.5, 140.2, 39.8, 15.5, 195.5, 219.8, 320.2, 344.5, 219.8, 248.2, 291.8,320.2 
-            ]) 
-            if mode == '-3':
-                phases *= -3
-
-            if mode == '-2':
-                #Mode =-2 
-                phases *= -2
-
-            elif mode == '-1':
-                #Mode = -1
-                phases *= -1
-
-            elif mode == '1':
-                #OAM mode 1
-                pass 
-            elif mode =='2':
-                # Mode 2 
-                phases *= 2
-
-            else:
-                #Mode = 3
-                phases *= 3
-
-            #send the appropriate phase
-            try: 
-                send_phases(phases)
-            except Exception as e:
-                ui.notify(f'Failed to send phases: {e}', color = 'red')
-            else:
-                ui.notify('Sucessfully sent phases')
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            for target, filename in images:
+                ui.image(f'media/{filename}')\
+                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                    .on('click', lambda t=target: oam_mode(t))
 
 #----END OAM MODE ----
 
@@ -348,7 +419,8 @@ def oam_page():
 #----HERMITE PAGE-----
 @ui.page('/hermite')
 def hermite_page():
-    ui.button('⬅ Back', on_click=ui.navigate.back)
+
+    ui.button('⬅ Back', on_click=nav_back)
     with ui.column().classes('w-full items-center  gap-6 mt-6'):
         # Header
         ui.label('Generate Hermite Beams') \
@@ -362,66 +434,35 @@ def hermite_page():
 
     #TODO create two Buttons
     with ui.row().classes('w-full justify-center items-center'):
-        ui.button('Continuous Transmission', on_click=lambda: ui.navigate.to('/continuous_tx')).\
+        ui.button('Measure Only', on_click=lambda: ui.navigate.to('/measure')).\
         classes('w-64 h-24 text-xl')
         ui.button('Scattering Experiment', on_click=lambda: ui.navigate.to('/scattering_experiment')).\
         classes('w-64 h-24 text-xl')
-    
+      
+
+    @ui.page('/measure')
+    def measure():
+        ui.button('⬅ Back', on_click=nav_back)
+        with ui.column().classes('w-full items-center  gap-6 mt-6'):
+            ui.label('Select your desired mode.').classes('text-base text-gray-600 text-center')
+            ui.label('Phases are applied to ports appropriatly.').classes('text-base text-gray-600 text-center')
+            ui.label('Energize the input port and measure.').classes('text-base text-gray-600 text-center')
+        images = [
+        ('01', '01.png'), 
+        ('10', '10.png'),
+        ('11', '11.png'),
+        ]
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            for target, filename in images:
+                ui.image(f'media/{filename}')\
+                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                    .on('click', lambda t=target: hermite_mode(t))
 
 
-    images = [
-    ('01', '01.png'), 
-    ('10', '10.png'),
-    ('11', '11.png'),
-    ]
-    with ui.row().classes('w-full justify-center items-center gap-4'):
-        for target, filename in images:
-            ui.image(f'media/{filename}')\
-                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda t=target: hermite_mode(t))
-    def hermite_mode(mode:str):
-        '''
-        sends the appropriate phases to generate hermite gaussian beam 
-        Args: 
-            mode (str) - requested hermite mode
-        ''' 
-        if mode == '01':
-            '''
-            mode 01 
-            top 8 elements 0 degrees
-            bottom 8 elements 180 degrees
-            '''
-            phases = np.array(
-                [0,0,0,0,0,0,0,0,180,180,180,180,180,180,180,180
-            ])
-        elif mode == '10':
-            '''
-            mode 10
-            left 8 elements 0 degrees
-            right 8 elements 180 degrees
-            '''
-            phases = np.array(
-                [0,0,180,180,0,0,180,180,0,0,180,180,0,0,180,180
-            ])
-        else:
-            '''
-            mode 11
-            top-left 4 elements 0 degrees
-            top-right 4 elements 180 degrees
-            bottom-left 4 elements 180 degrees
-            bottom-right 4 elements 0 degrees
-            '''
-            phases = np.array([
-                0,0,180,180,0,0,180,180,180,180,0,0,180,180,0,0
-            ]) 
-    
-        try: 
-            send_phases(phases)
-        except Exception as e:
-            ui.notify(f'Failed to send phases: {e}', color = 'red')
-        else:
-            ui.notify('Sucessfully sent phases')
-   
+
+    @ui.page('/scattering_experiment')
+    def scattering_experiment():
+        ui.button('⬅ Back', on_click=nav_back)
 #---- END Hermite ----
 
 
@@ -430,7 +471,7 @@ def hermite_page():
 #----Beam Steering----
 @ui.page('/beam')
 def beam_page():
-    ui.button('⬅ Back', on_click=ui.navigate.back)
+    ui.button('⬅ Back', on_click=nav_back)
     with ui.row().classes('w-full justify-center items-center'):
         ui.button('Receive Mode', on_click=lambda: ui.navigate.to('/receive_mode')).\
         classes('w-64 h-24 text-xl')
@@ -446,7 +487,7 @@ def beam_page():
     @ui.page('/transmit_mode')
     def transmit_mode():
         # Back button in the top-left
-        ui.button('⬅ Back', on_click=ui.navigate.back)
+        ui.button('⬅ Back', on_click=nav_back)
         with ui.column().classes('w-full'):
             # Header
             ui.label('Transmit mode') \
@@ -580,6 +621,7 @@ def beam_page():
                     .force_reload()
 
             def stop_live():
+                #stop transmitting 
                 stop_tx()
                 stop_event.set()
                 ui.notify("Live plot stopped", type='positive')
@@ -605,7 +647,7 @@ def beam_page():
     @ui.page('/receive_mode')
     def receive_mode():        
         # Back button in the top-left
-        ui.button('⬅ Back', on_click=ui.navigate.back)
+        ui.button('⬅ Back', on_click=nav_back)
         with ui.column().classes('w-full'):
             # Header
             ui.label('Receive mode') \
