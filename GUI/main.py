@@ -159,11 +159,11 @@ def main_page():
     ).style('width: 300px')
 
     images = [
+    ('/calibrate', 'Calibration.png'),
     ('/manual', 'Manual_Phase_Control.png'), 
-    ('/oam', 'OAM_Control.png'),
-    ('/hermite', 'Hermite_Control.png'),
-    ('/beam', 'Beam_Control.png'),
-    ('/calibrate', 'Calibration.png')
+    ('/oam', 'OAM_Control1.png'),
+    ('/hermite', 'Hermite_Control1.png'),
+    ('/beam', 'Beam_Control.png')
     ]
 
     with ui.column().classes('w-full items-center'):
@@ -191,7 +191,7 @@ def main_page():
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in images:
             classes_style = 'w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200' 
-            if target == images[len(images) - 1][0] and not PHASE_CORRECTED: 
+            if target == images[0][0] and not PHASE_CORRECTED: 
                 ui.image(f'media/{filename}')\
                     .classes(f'{classes_style} blink') \
                     .on('click', lambda t=target: navigate_if_ready(t))
@@ -549,7 +549,7 @@ def beam_page():
                     fig.data[0].x = t_values
                     fig.data[0].y = energy_values
                     try:
-                        fig.update_yaxes(range=[int(ymin.value),int(ymax.value)])
+                        fig.update_yaxes(range=[int(y_min.value),int(y_max.value)])
                     except Exception:
                         pass #temporary invalid values
                     live_plot.update()  # NiceGUI triggers plot update
