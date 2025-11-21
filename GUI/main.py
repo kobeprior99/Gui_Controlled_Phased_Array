@@ -481,6 +481,18 @@ def beam_page():
                     min = 0, max = 360
                 ).style('width:20%')
                  
+            with ui.row().classes('w-full justify-center items-center'):
+                y_min = ui.number(
+                    label ='Set Minimum Power for Graph',
+                    value=0,
+                    min=1
+                ).style('width:30%') 
+                y_max = ui.number(
+                    label ='Set Maximum Power for Graph',
+                    value=10,
+                    min=1
+                ).style('width:30%')
+
             fig = go.Figure(
                 go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
             )
@@ -536,6 +548,10 @@ def beam_page():
                     # Update the figure's data
                     fig.data[0].x = t_values
                     fig.data[0].y = energy_values
+                    try:
+                        fig.update_yaxes(range=[int(ymin.value),int(ymax.value)])
+                    except Exception:
+                        pass #temporary invalid values
                     live_plot.update()  # NiceGUI triggers plot update
 
                     await asyncio.sleep(0.05)  # ~20 Hz refresh
