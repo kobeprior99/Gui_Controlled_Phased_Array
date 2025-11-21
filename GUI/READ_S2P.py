@@ -17,8 +17,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
-S2P_DIR = Path("S2P") #directory containing port data
+# change directory of s2p files here
+S2P_DIR = Path("S2P_11-20") #directory containing port data
 
+# Cycle through multiple line styles
+LINE_STYLE = ['-', '--', '-.', ':']
 
 def read_s2p(filepath: Path):
     """
@@ -70,7 +73,9 @@ def plot_S41_mag():
         file = S2P_DIR / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s41))
-        plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
+        #pick linestyle based on index
+        ls = LINE_STYLE[(i-1) % len(LINE_STYLE)]
+        plt.plot(freqs / 1e9, mag_db,linestyle=ls, label=f"Port {i}")
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("|S41| (dB)")
     plt.title("S41 Magnitude (dB) for Each Port")
@@ -168,13 +173,93 @@ def plot_S44_mag():
     plt.show()
 
 
+def plot_relative_phase(unwrap=True, interactive=False):
+    """Plot S41 phase relative to the 'longest' channel (most negative phase)."""
+
+    phases = []
+    freqs_ref = None
+
+    # --- Load all phases first ---
+    for i in range(1, 17):
+        file = S2P_DIR / f"Port{i}.s2p"
+        freqs, _, s41, _ = read_s2p(file)
+
+        if freqs_ref is None:
+            freqs_ref = freqs  # ensure consistent frequency axis
+
+        phase = np.angle(s41, deg=False)  # radians
+        if unwrap:
+            phase = np.unwrap(phase)
+        phase_deg = np.rad2deg(phase)
+
+        phases.append(phase_deg)
+
+    phases = np.array(phases)  # shape (16, Nfreq)
+
+    # --- Identify reference port: most negative average phase ---
+    mean_phases = phases.mean(axis=1)
+    ref_index = np.argmin(mean_phases)   # port with minimal mean phase
+    ref_phase = phases[ref_index]
+
+    print(f"Reference port = Port {ref_index+1}")
+
+    # --- Compute relative phases ---
+    rel_phases = phases - ref_phase  # broadcast subtract
+
+    # --- Plot ---
+    plt.figure(figsize=(10, 6))
+    lines = []
+    labels = []
+
+    for i in range(16):
+        line, = plt.plot(freqs_ref / 1e9,
+                         rel_phases[i],
+                         label=f"Port {i+1}")
+        lines.append(line)
+        labels.append(f"Port {i+1}")
+
+    plt.xlabel("Frequency (GHz)")
+    plt.ylabel("Relative Phase (degrees)")
+    plt.title("Relative S41 Phase (Referenced to Longest Path)")
+    plt.grid(True)
+    leg = plt.legend(ncol=4, fontsize=8, fancybox=True)
+    plt.tight_layout()
+
+    if interactive:
+        # enable clickable legend
+        leg = plt.legend(ncol=4, fontsize=8, fancybox=True)
+        for lg in leg.get_lines():
+            lg.set_picker(True)
+            lg.set_pickradius(5)
+
+        def on_pick(event):
+            lg_line = event.artist
+            label = lg_line.get_label()
+            idx = labels.index(label)
+
+            # Highlight selected
+            for j, line in enumerate(lines):
+                if j == idx:
+                    line.set_linewidth(3)
+                    line.set_alpha(1.0)
+                    line.set_zorder(3)
+                else:
+                    line.set_linewidth(1)
+                    line.set_alpha(0.25)
+                    line.set_zorder(1)
+            plt.draw()
+
+        plt.gcf().canvas.mpl_connect("pick_event", on_pick)
+
+    plt.show()
+
 def main():
     # For testing purposes
     plot_S11_mag()
     plot_S41_mag()
     plot_S44_mag()
     plot_S41_phase(unwrap=True, interactive = True)
-
+    plot_relative_phase()
 
 if __name__ == '__main__':
     main()
