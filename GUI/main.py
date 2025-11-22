@@ -305,12 +305,10 @@ def main_page():
 #---- END MAIN PAGE ----
 
 
-
-
 # ---- SUBPAGES ----
 
 
-# ---- manual phase shift page ----
+# ---- Manual Phase Shift Page ----
 @ui.page('/manual')
 def manual_page():
     # Back button in the top-left
@@ -572,7 +570,7 @@ def oam_page():
             #update ui image
             baseline_container.clear()
             with baseline_container:
-                ui.image('media/baseline.png').style('width:40%;').force_reload()
+                ui.image('media/baseline.png').style('width:60%;').force_reload()
 
         def plot_scatterer():
             '''
@@ -593,7 +591,7 @@ def oam_page():
             #update ui image
             scatterer_container.clear()
             with scatterer_container:
-                ui.image('media/scatterer_burst.png').style('width:40%;').force_reload()
+                ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
 
         def plot_difference():
             '''
@@ -612,7 +610,7 @@ def oam_page():
             #update ui image
             difference_container.clear()
             with difference_container:
-                ui.image('media/power_diff.png').style('width:40%;').force_reload()
+                ui.image('media/power_diff.png').style('width:60%;').force_reload()
 
 # Step 3: measure baseline
         ui.label("Step 3: Measure Baseline").style('order: 1;')
@@ -832,7 +830,7 @@ def hermite_page():
             #update ui image
             baseline_container.clear()
             with baseline_container:
-                ui.image('media/baseline.png').style('width:40%;').force_reload()
+                ui.image('media/baseline.png').style('width:60%;').force_reload()
 
         def plot_scatterer():
             '''
@@ -853,7 +851,7 @@ def hermite_page():
             #update ui image
             scatterer_container.clear()
             with scatterer_container:
-                ui.image('media/scatterer_burst.png').style('width:40%;').force_reload()
+                ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
 
         def plot_difference():
             '''
@@ -872,7 +870,7 @@ def hermite_page():
             #update ui image
             difference_container.clear()
             with difference_container:
-                ui.image('media/power_diff.png').style('width:40%;').force_reload()
+                ui.image('media/power_diff.png').style('width:60%;').force_reload()
 
 # Step 3: measure baseline
         ui.label("Step 3: Measure Baseline").style('order: 1;')
@@ -891,11 +889,7 @@ def hermite_page():
         ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
         # difference_container has order: 11
   
-
-
 #---- END Hermite ----
-
-
 
 
 #----Beam Steering----
