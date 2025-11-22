@@ -27,4 +27,4 @@ RX_GAIN =10 #adjust as needed
 #4 ms to fill buffer
 BUFFER_SIZE = 2048 
 NUM_AVG = 4
-SETTLE_TIME = 1#time to transmit before capturing burst
+SETTLE_TIME = 1 #time to transmit before capturing burst

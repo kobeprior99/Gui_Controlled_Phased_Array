@@ -517,7 +517,7 @@ def oam_page():
 
 
         burst_data = {}
-        def record_burst(trial_name, duration=1.0, sample_interval=0.05):
+        def record_burst(trial_name, duration=1.0, sample_interval=0.01):
             '''
             transmit a burst of continuous wave and record recieved "power"
             '''
@@ -560,7 +560,7 @@ def oam_page():
             x = np.arange(len(e_b))
 
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_b, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_b[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Baseline')
@@ -581,7 +581,7 @@ def oam_page():
             #number of samples
             x = np.arange(len(e_s))
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_s, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_s[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Scatterer')
@@ -600,7 +600,7 @@ def oam_page():
             e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
             x = np.arange(len(e_diff))
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_diff, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Difference')
@@ -777,7 +777,7 @@ def hermite_page():
 
 
         burst_data = {}
-        def record_burst(trial_name, duration=1.0, sample_interval=0.05):
+        def record_burst(trial_name, duration=1.0, sample_interval=0.01):
             '''
             transmit a burst of continuous wave and record recieved "power"
             '''
@@ -820,7 +820,7 @@ def hermite_page():
             x = np.arange(len(e_b))
 
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_b, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_b[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Baseline')
@@ -841,7 +841,7 @@ def hermite_page():
             #number of samples
             x = np.arange(len(e_s))
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_s, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_s[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Scatterer')
@@ -860,7 +860,7 @@ def hermite_page():
             e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
             x = np.arange(len(e_diff))
             plt.figure(figsize=(8,5))
-            plt.plot(x, e_diff, '-o', label='Average Power Recieved')
+            plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Difference')
