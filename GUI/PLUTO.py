@@ -32,15 +32,17 @@ except:
     print('No PLUTO attached')
 def tx():
     '''Send the tone'''
+    global TX_ACTIVE
     sdr.tx(TONE)
     TX_ACTIVE=True
 
 def stop_tx():
     '''stop transmitting by deleting the buffer'''
     #check if tx is active though 
+    global TX_ACTIVE
     if TX_ACTIVE == True:
         sdr.tx_destroy_buffer()
-        tx_active=False
+        TX_ACTIVE=False
 
 def get_energy() -> float:
     """

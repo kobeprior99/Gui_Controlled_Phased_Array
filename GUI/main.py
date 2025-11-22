@@ -27,14 +27,14 @@
 import time, serial, struct, serial.tools.list_ports,json,os
 from nicegui import ui
 import numpy as np 
-from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ  
+from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle 
 import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, tx, stop_tx, TX_ACTIVE
+from PLUTO import get_energy, tx, stop_tx
 import plotly.graph_objects as go
 #global serial handler
 ser = None
@@ -44,7 +44,8 @@ PHASE_OFFSETS =np.zeros(16,dtype=int)
 PHASE_CORRECTED = False 
 #store reference to phase_input number boxes
 phase_inputs = [] 
-
+#for highlighting selected mode hg lg section 
+selected = None
 
 
 #----HELPER FUNCTIONS----
@@ -393,27 +394,239 @@ def oam_page():
         ui.button('Scattering Experiment', on_click=lambda: ui.navigate.to('/scattering_experiment')).\
         classes('w-64 h-24 text-xl')
 
+    images = [
+    ('-3', 'oam-3.png'),
+    ('-2', 'oam-2.png'), 
+    ('-1', 'oam-1.png'),
+    ('1', 'oam1.png'),
+    ('2', 'oam2.png'),
+    ('3', 'oam3.png')
+    ]
+
+    image_elements = {} # store references to each image ui element
+    def select_image(t):
+        '''add red box around selected image and remove from old one'''
+        global selected
+        #remove from previously selected
+        if selected is not None:
+            image_elements[selected].classes(remove='ring-4 ring-red-500')
+        #add red boarder to new image
+        image_elements[t].classes('ring-4 ring-red-500')
+        selected = t
+        #call function to transmit that hermite mode
+        oam_mode(t)
+
     @ui.page('/measure')
-    def measure(): 
+    def measure():
+        #header
+        ui.label('Measure Hermite Gaussian Beams') \
+            .classes('text-2xl font-bold text-center')
+
         ui.button('⬅ Back', on_click=nav_back)
         with ui.column().classes('w-full items-center  gap-6 mt-6'):
             ui.label('Select your desired mode.').classes('text-base text-gray-600 text-center')
             ui.label('Phases are applied to ports appropriatly.').classes('text-base text-gray-600 text-center')
             ui.label('Energize the input port and measure.').classes('text-base text-gray-600 text-center')
-        images = [
-        ('-3', 'oam-3.png'),
-        ('-2', 'oam-2.png'), 
-        ('-1', 'oam-1.png'),
-        ('1', 'oam1.png'),
-        ('2', 'oam2.png'),
-        ('3', 'oam3.png')
-        ]
-
         with ui.row().classes('w-full justify-center items-center gap-4'):
             for target, filename in images:
-                ui.image(f'media/{filename}')\
+                img = ui.image(f'media/{filename}')\
                     .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                    .on('click', lambda t=target: oam_mode(t))
+                    .on('click', lambda _, t=target: select_image(t))
+                image_elements[target] = img #store reference
+
+    @ui.page('/scattering_experiment')
+    def scattering_experiment():
+        ui.button('⬅ Back', on_click=nav_back)
+        #header
+        ui.label('Scattering Experiment Hermite Gaussian Beams') \
+            .classes('text-2xl font-bold text-center')
+        ui.image('media/scat_instruct.png').style('width:30%')
+        #Step 1: Choose Mode 
+        ui.label("Step 1: Choose The Mode")
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            for target, filename in images:
+                img = ui.image(f'media/{filename}')\
+                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                    .on('click', lambda _, t=target: select_image(t))
+                image_elements[target] = img #store reference
+        #Step 2: Find Beam Direction
+        ui.label('Step2: Confirm Main Beam Direction')
+        ui.image('media/Step1.jpeg').style('width:30%')  
+
+        #live tx plot 
+        fig = go.Figure(
+            go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
+        )
+
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            xaxis_title='Time(s)',
+            yaxis_title='Avg Power Received'
+        )
+        live_plot = ui.plotly(fig).classes('w-3/4 h-64')
+        image_container = ui.row()\
+            .classes('justify-center items-center')\
+        .style('order:2; width:90%;')
+        stop_event = asyncio.Event()
+        
+        
+        def start_live_plot():
+            # Start continuous TX
+            tx()
+            # Reset stop_event
+            stop_event.clear()
+
+            # Launch async update
+            asyncio.create_task(live_update())
+            stop_button.visible = True
+
+        async def live_update():
+            t_values = []
+            energy_values = []
+            start_time = time.time()
+
+            while not stop_event.is_set():
+                t = time.time()-start_time
+                energy = get_energy()  # sample SDR
+                t_values.append(t)
+                energy_values.append(energy)
+                t_values = t_values[-100:]
+                energy_values = energy_values[-100:]
+                # Update the figure's data
+                fig.data[0].x = t_values
+                fig.data[0].y = energy_values
+                try:
+                    fig.update_yaxes(range=[0,800])
+                except Exception:
+                    pass #temporary invalid values
+                live_plot.update()  # NiceGUI triggers plot update
+
+                await asyncio.sleep(0.05)  # ~20 Hz refresh
+                
+
+        def stop_live():
+            #stop transmitting 
+            stop_tx()
+            stop_event.set()
+            ui.notify("Live plot stopped", type='positive')
+
+        # Buttons
+        ui.button('Transmit & Live Plot', on_click=start_live_plot)
+        stop_button = ui.button(
+            'Stop',
+            on_click=stop_live
+        )
+        stop_button.visible = False            
+
+
+        burst_data = {}
+        def record_burst(trial_name, duration=1.0, sample_interval=0.05):
+            '''
+            transmit a burst of continuous wave and record recieved "power"
+            '''
+            #start trasmission
+            tx()
+            time.sleep(SETTLE_TIME)
+
+            energy_values = []
+
+            num_samples = int(duration/sample_interval)
+            for _ in range(num_samples):
+                energy = get_energy()
+                energy_values.append(energy)
+                time.sleep(sample_interval)
+            #end transmission
+            stop_tx()
+            #store the data
+            burst_data[trial_name] ={
+                'energy': np.array(energy_values)
+            }
+            ui.notify("successfully recorded burst")
+    
+        baseline_container=ui.column()
+        scatterer_container=ui.column()
+        difference_container=ui.column()
+        def plot_no_scatterer():
+            '''
+            Record burst data then plot it
+            '''
+            record_burst('baseline')
+            e_b = burst_data['baseline']['energy']
+            #number of samples
+            x = np.arange(len(e_b))
+
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_b, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Baseline')
+            plt.grid(True)
+            plt.savefig('media/baseline.png')
+            plt.close()
+            #update ui image
+            baseline_container.clear()
+            with basaeline_container:
+                ui.image('media/baseline.png').style('width:40%;').force_reload()
+
+        def plot_scatterer():
+            '''
+            Record burst data then plot it 
+            '''
+            record_burst('scatterer')
+            e_s = burst_data['scatterer']['energy']
+            #number of samples
+            x = np.arange(len(e_s))
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_s, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Scatterer')
+            plt.grid(True)
+            plt.savefig('media/scatterer_burst.png')
+            plt.close()
+            #update ui image
+            scatterer_container.clear()
+            with scatterer_container:
+                ui.image('media/scatterer_burst.png').style('width:40%;').force_reload()
+
+        def plot_difference():
+            '''
+            Plot scattered - baseline
+            '''
+            e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
+            x = np.arange(len(e_diff))
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_diff, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Baseline')
+            plt.grid(True)
+            plt.savefig('media/power_diff.png')
+            plt.close()
+            #update ui image
+            difference_container.clear()
+            with baseline_container:
+                ui.image('media/power_diff.png').style('width:40%;').force_reload()
+
+        #Step3: measure baseline
+        ui.label("Step 3: Measure Baseline")
+        #display snapshot of burst average energy
+        ui.image('media/Step2.jpeg').style('width:30%')
+        #show the example image
+        ui.button("Start", on_click=plot_no_scatterer)
+
+        baseline_container
+        #Step4: measure scattering
+        ui.label("Step 4: Measure Scattering")
+        #display snapshot of burst average energy
+        ui.image('media/Step3.jpeg').style('width:30%')
+        ui.button("Start", on_click=plot_scatterer)
+        scatterer_container
+
+        ui.label("Step 5: Measure Scattering")
+        ui.button("Show Difference", on_click=plot_difference)
+        difference_container
+
 
 #----END OAM MODE ----
 
@@ -434,7 +647,6 @@ def hermite_page():
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
 
-    #TODO create two Buttons
     with ui.row().classes('w-full justify-center items-center'):
         ui.button('Measure Only', on_click=lambda: ui.navigate.to('/measure')).\
         classes('w-64 h-24 text-xl')
@@ -442,10 +654,28 @@ def hermite_page():
         classes('w-64 h-24 text-xl')
       
 
+    images = [
+    ('01', '01.png'), 
+    ('10', '10.png'),
+    ('11', '11.png'),
+    ]
+    image_elements = {} # store references to each image ui element
+    def select_image(t):
+        '''add red box around selected image and remove from old one'''
+        global selected
+        #remove from previously selected
+        if selected is not None:
+            image_elements[selected].classes(remove='ring-4 ring-red-500')
+        #add red boarder to new image
+        image_elements[t].classes('ring-4 ring-red-500')
+        selected = t
+        #call function to transmit that hermite mode
+        hermite_mode(t)
+
     @ui.page('/measure')
     def measure():
         #header
-        ui.label('Measure Hermite Beams') \
+        ui.label('Measure Hermite Gaussian Beams') \
             .classes('text-2xl font-bold text-center')
 
         ui.button('⬅ Back', on_click=nav_back)
@@ -453,26 +683,206 @@ def hermite_page():
             ui.label('Select your desired mode.').classes('text-base text-gray-600 text-center')
             ui.label('Phases are applied to ports appropriatly.').classes('text-base text-gray-600 text-center')
             ui.label('Energize the input port and measure.').classes('text-base text-gray-600 text-center')
-        images = [
-        ('01', '01.png'), 
-        ('10', '10.png'),
-        ('11', '11.png'),
-        ]
         with ui.row().classes('w-full justify-center items-center gap-4'):
             for target, filename in images:
-                ui.image(f'media/{filename}')\
+                img = ui.image(f'media/{filename}')\
                     .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                    .on('click', lambda t=target: hermite_mode(t))
-
-
+                    .on('click', lambda _, t=target: select_image(t))
+                image_elements[target] = img #store reference
 
     @ui.page('/scattering_experiment')
     def scattering_experiment():
         ui.button('⬅ Back', on_click=nav_back)
         #header
-        ui.label('Measure Hermite Beams') \
+        ui.label('Scattering Experiment Hermite Gaussian Beams') \
             .classes('text-2xl font-bold text-center')
-        ui.label("Step 1: Choose the Mode")
+        ui.image('media/scat_instruct.png').style('width:30%')
+        #Step 1: Choose Mode 
+        ui.label("Step 1: Choose The Mode")
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            for target, filename in images:
+                img = ui.image(f'media/{filename}')\
+                    .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                    .on('click', lambda _, t=target: select_image(t))
+                image_elements[target] = img #store reference
+        #Step 2: Find Beam Direction
+        ui.label('Step2: Confirm Main Beam Direction')
+        ui.image('media/Step1.jpeg').style('width:30%')  
+
+        #live tx plot 
+        fig = go.Figure(
+            go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
+        )
+
+        fig.update_layout(
+            margin=dict(l=0, r=0, t=0, b=0),
+            xaxis_title='Time(s)',
+            yaxis_title='Avg Power Received'
+        )
+        live_plot = ui.plotly(fig).classes('w-3/4 h-64')
+        image_container = ui.row()\
+            .classes('justify-center items-center')\
+        .style('order:2; width:90%;')
+        stop_event = asyncio.Event()
+        
+        
+        def start_live_plot():
+            # Start continuous TX
+            tx()
+            # Reset stop_event
+            stop_event.clear()
+
+            # Launch async update
+            asyncio.create_task(live_update())
+            stop_button.visible = True
+
+        async def live_update():
+            t_values = []
+            energy_values = []
+            start_time = time.time()
+
+            while not stop_event.is_set():
+                t = time.time()-start_time
+                energy = get_energy()  # sample SDR
+                t_values.append(t)
+                energy_values.append(energy)
+                t_values = t_values[-100:]
+                energy_values = energy_values[-100:]
+                # Update the figure's data
+                fig.data[0].x = t_values
+                fig.data[0].y = energy_values
+                try:
+                    fig.update_yaxes(range=[0,800])
+                except Exception:
+                    pass #temporary invalid values
+                live_plot.update()  # NiceGUI triggers plot update
+
+                await asyncio.sleep(0.05)  # ~20 Hz refresh
+                
+
+        def stop_live():
+            #stop transmitting 
+            stop_tx()
+            stop_event.set()
+            ui.notify("Live plot stopped", type='positive')
+
+        # Buttons
+        ui.button('Transmit & Live Plot', on_click=start_live_plot)
+        stop_button = ui.button(
+            'Stop',
+            on_click=stop_live
+        )
+        stop_button.visible = False            
+
+
+        burst_data = {}
+        def record_burst(trial_name, duration=1.0, sample_interval=0.05):
+            '''
+            transmit a burst of continuous wave and record recieved "power"
+            '''
+            #start trasmission
+            tx()
+            time.sleep(SETTLE_TIME)
+
+            energy_values = []
+
+            num_samples = int(duration/sample_interval)
+            for _ in range(num_samples):
+                energy = get_energy()
+                energy_values.append(energy)
+                time.sleep(sample_interval)
+            #end transmission
+            stop_tx()
+            #store the data
+            burst_data[trial_name] ={
+                'energy': np.array(energy_values)
+            }
+            ui.notify("successfully recorded burst")
+    
+        baseline_container=ui.column()
+        scatterer_container=ui.column()
+        difference_container=ui.column()
+        def plot_no_scatterer():
+            '''
+            Record burst data then plot it
+            '''
+            record_burst('baseline')
+            e_b = burst_data['baseline']['energy']
+            #number of samples
+            x = np.arange(len(e_b))
+
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_b, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Baseline')
+            plt.grid(True)
+            plt.savefig('media/baseline.png')
+            plt.close()
+            #update ui image
+            baseline_container.clear()
+            with basaeline_container:
+                ui.image('media/baseline.png').style('width:40%;').force_reload()
+
+        def plot_scatterer():
+            '''
+            Record burst data then plot it 
+            '''
+            record_burst('scatterer')
+            e_s = burst_data['scatterer']['energy']
+            #number of samples
+            x = np.arange(len(e_s))
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_s, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Scatterer')
+            plt.grid(True)
+            plt.savefig('media/scatterer_burst.png')
+            plt.close()
+            #update ui image
+            scatterer_container.clear()
+            with scatterer_container:
+                ui.image('media/scatterer_burst.png').style('width:40%;').force_reload()
+
+        def plot_difference():
+            '''
+            Plot scattered - baseline
+            '''
+            e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
+            x = np.arange(len(e_diff))
+            plt.figure(figsize=(8,5))
+            plt.plot(x, e_diff, '-o', label='Average Power Recieved')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Baseline')
+            plt.grid(True)
+            plt.savefig('media/power_diff.png')
+            plt.close()
+            #update ui image
+            difference_container.clear()
+            with baseline_container:
+                ui.image('media/power_diff.png').style('width:40%;').force_reload()
+
+        #Step3: measure baseline
+        ui.label("Step 3: Measure Baseline")
+        #display snapshot of burst average energy
+        ui.image('media/Step2.jpeg').style('width:30%')
+        #show the example image
+        ui.button("Start", on_click=plot_no_scatterer)
+
+        baseline_container
+        #Step4: measure scattering
+        ui.label("Step 4: Measure Scattering")
+        #display snapshot of burst average energy
+        ui.image('media/Step3.jpeg').style('width:30%')
+        ui.button("Start", on_click=plot_scatterer)
+        scatterer_container
+
+        ui.label("Step 5: Measure Scattering")
+        ui.button("Show Difference", on_click=plot_difference)
+        difference_container
+   
 
 
 #---- END Hermite ----
