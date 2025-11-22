@@ -315,19 +315,21 @@ def main_page():
 def manual_page():
     # Back button in the top-left
     ui.button('⬅ Back', on_click=ui.navigate.back)
-
+    
     # Main content centered horizontally
     with ui.column().classes('w-full items-center  gap-6 mt-6'):
         # Header
         ui.label('Manually Control Phase of Each Element') \
             .classes('text-2xl font-bold text-center')
 
-        # Instructions
-        ui.label(
-            '''Enter the phase in degrees (0–360) for each element. 
-            Select Arduino Port from drop down menu. 
-            Unused elements should remain at 0.'''
-        ).classes('text-base text-gray-600 text-center')
+        with ui.column().classes('items-left gap-2 text-base text-gray-600'):
+            ui.label('1. Enter the desired phase (0–360°) for each active element.')
+            ui.label('2. Leave unused elements at 0°.')
+            ui.label('3. Press "SUBMIT" to send the configuration to the controller.')
+            ui.label('4. Energize the input port and measure farfield pattern in antenna chamber.')
+
+            ui.label('Example Uses: multi fed antenna or phasing non default array')
+        
         # Sliders in two columns
         sliders = []
         with ui.column().classes('w-full items-center gap-6 mt-6'):
@@ -391,7 +393,7 @@ def oam_page():
         ui.button('Scattering Experiment', on_click=lambda: ui.navigate.to('/scattering_experiment')).\
         classes('w-64 h-24 text-xl')
 
-    @ui.page(\measure)
+    @ui.page('/measure')
     def measure(): 
         ui.button('⬅ Back', on_click=nav_back)
         with ui.column().classes('w-full items-center  gap-6 mt-6'):
@@ -442,6 +444,10 @@ def hermite_page():
 
     @ui.page('/measure')
     def measure():
+        #header
+        ui.label('Measure Hermite Beams') \
+            .classes('text-2xl font-bold text-center')
+
         ui.button('⬅ Back', on_click=nav_back)
         with ui.column().classes('w-full items-center  gap-6 mt-6'):
             ui.label('Select your desired mode.').classes('text-base text-gray-600 text-center')
@@ -463,6 +469,12 @@ def hermite_page():
     @ui.page('/scattering_experiment')
     def scattering_experiment():
         ui.button('⬅ Back', on_click=nav_back)
+        #header
+        ui.label('Measure Hermite Beams') \
+            .classes('text-2xl font-bold text-center')
+        ui.label("Step 1: Choose the Mode")
+
+
 #---- END Hermite ----
 
 
