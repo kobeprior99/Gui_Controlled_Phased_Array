@@ -29,7 +29,6 @@ from nicegui import ui
 import numpy as np 
 from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle 
 import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
@@ -543,9 +542,16 @@ def oam_page():
             }
             ui.notify("successfully recorded burst")
     
-        baseline_container=ui.column()
-        scatterer_container=ui.column()
-        difference_container=ui.column()
+        baseline_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:4; width:90%;')
+        scatterer_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:8; width:90%;')
+        difference_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:11; width:90%;')
+        
         def plot_no_scatterer():
             '''
             Record burst data then plot it
@@ -565,7 +571,7 @@ def oam_page():
             plt.close()
             #update ui image
             baseline_container.clear()
-            with basaeline_container:
+            with baseline_container:
                 ui.image('media/baseline.png').style('width:40%;').force_reload()
 
         def plot_scatterer():
@@ -599,34 +605,31 @@ def oam_page():
             plt.plot(x, e_diff, '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Baseline')
+            plt.title('Energy Burst Measurement - Difference')
             plt.grid(True)
             plt.savefig('media/power_diff.png')
             plt.close()
             #update ui image
             difference_container.clear()
-            with baseline_container:
+            with difference_container:
                 ui.image('media/power_diff.png').style('width:40%;').force_reload()
 
-        #Step3: measure baseline
-        ui.label("Step 3: Measure Baseline")
-        #display snapshot of burst average energy
-        ui.image('media/Step2.jpeg').style('width:30%')
-        #show the example image
-        ui.button("Start", on_click=plot_no_scatterer)
+# Step 3: measure baseline
+        ui.label("Step 3: Measure Baseline").style('order: 1;')
+        ui.image('media/Step2.jpeg').style('order: 2; width: 30%;')
+        ui.button("Start", on_click=plot_no_scatterer).style('order: 3;')
+        # baseline_container has order: 4
 
-        baseline_container
-        #Step4: measure scattering
-        ui.label("Step 4: Measure Scattering")
-        #display snapshot of burst average energy
-        ui.image('media/Step3.jpeg').style('width:30%')
-        ui.button("Start", on_click=plot_scatterer)
-        scatterer_container
+        # Step 4: measure scattering
+        ui.label("Step 4: Measure Scattering").style('order: 5;')
+        ui.image('media/Step3.jpeg').style('order: 6; width: 30%;')
+        ui.button("Start", on_click=plot_scatterer).style('order: 7;')
+        # scatterer_container has order: 8
 
-        ui.label("Step 5: Measure Scattering")
-        ui.button("Show Difference", on_click=plot_difference)
-        difference_container
-
+        # Step 5: show difference
+        ui.label("Step 5: Show Difference").style('order: 9;')
+        ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
+        # difference_container has order: 11
 
 #----END OAM MODE ----
 
@@ -799,9 +802,16 @@ def hermite_page():
             }
             ui.notify("successfully recorded burst")
     
-        baseline_container=ui.column()
-        scatterer_container=ui.column()
-        difference_container=ui.column()
+        baseline_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:4; width:90%;')
+        scatterer_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:8; width:90%;')
+        difference_container=ui.row()\
+            .classes('justify-center items-center')\
+        .style('order:11; width:90%;')
+        
         def plot_no_scatterer():
             '''
             Record burst data then plot it
@@ -821,7 +831,7 @@ def hermite_page():
             plt.close()
             #update ui image
             baseline_container.clear()
-            with basaeline_container:
+            with baseline_container:
                 ui.image('media/baseline.png').style('width:40%;').force_reload()
 
         def plot_scatterer():
@@ -855,34 +865,32 @@ def hermite_page():
             plt.plot(x, e_diff, '-o', label='Average Power Recieved')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Baseline')
+            plt.title('Energy Burst Measurement - Difference')
             plt.grid(True)
             plt.savefig('media/power_diff.png')
             plt.close()
             #update ui image
             difference_container.clear()
-            with baseline_container:
+            with difference_container:
                 ui.image('media/power_diff.png').style('width:40%;').force_reload()
 
-        #Step3: measure baseline
-        ui.label("Step 3: Measure Baseline")
-        #display snapshot of burst average energy
-        ui.image('media/Step2.jpeg').style('width:30%')
-        #show the example image
-        ui.button("Start", on_click=plot_no_scatterer)
+# Step 3: measure baseline
+        ui.label("Step 3: Measure Baseline").style('order: 1;')
+        ui.image('media/Step2.jpeg').style('order: 2; width: 30%;')
+        ui.button("Start", on_click=plot_no_scatterer).style('order: 3;')
+        # baseline_container has order: 4
 
-        baseline_container
-        #Step4: measure scattering
-        ui.label("Step 4: Measure Scattering")
-        #display snapshot of burst average energy
-        ui.image('media/Step3.jpeg').style('width:30%')
-        ui.button("Start", on_click=plot_scatterer)
-        scatterer_container
+        # Step 4: measure scattering
+        ui.label("Step 4: Measure Scattering").style('order: 5;')
+        ui.image('media/Step3.jpeg').style('order: 6; width: 30%;')
+        ui.button("Start", on_click=plot_scatterer).style('order: 7;')
+        # scatterer_container has order: 8
 
-        ui.label("Step 5: Measure Scattering")
-        ui.button("Show Difference", on_click=plot_difference)
-        difference_container
-   
+        # Step 5: show difference
+        ui.label("Step 5: Show Difference").style('order: 9;')
+        ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
+        # difference_container has order: 11
+  
 
 
 #---- END Hermite ----
