@@ -85,7 +85,14 @@ def plot_s1p_4x4():
     Reads element1.s1p ... element16.s1p from directory
     and plots |S11| dB for all on the same plot.
     """
-    plt.figure(figsize=(10, 6)) for i in range(1, 17): filepath = Path("S1P_4x4") / f"element{i}.s1p" freqs, s11 = read_s1p(filepath) s11_db = 20 * np.log10(np.abs(s11)) plt.plot(freqs, s11_db, label=f"Element {i}")
+    plt.figure(figsize=(10, 6))
+    for i in range(1, 17):
+        filepath = Path("S1P_4x4") / f"element{i}.s1p"
+        freqs, s11 = read_s1p(filepath)
+
+        s11_db = 20 * np.log10(np.abs(s11))
+        plt.plot(freqs, s11_db, label=f"Element {i}")
+
     plt.xlabel("Frequency")
     plt.ylabel("|S11| (dB)")
     plt.title("S11 for All 16 Elements")
