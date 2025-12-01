@@ -19,10 +19,8 @@ from pathlib import Path
 
 # change directory of s2p files here
 S2P_DIR = Path("S2P_11-20") #directory containing port data
-
 # Cycle through multiple line styles
-LINE_STYLE = ['-', '--', '-.', ':']
-
+LINE_STYLE = ['-']
 def read_s2p(filepath: Path):
     """
     Read S-parameter data from a .s2p file.
@@ -77,8 +75,8 @@ def plot_S41_mag():
         ls = LINE_STYLE[(i-1) % len(LINE_STYLE)]
         plt.plot(freqs / 1e9, mag_db,linestyle=ls, label=f"Port {i}")
     plt.xlabel("Frequency (GHz)")
-    plt.ylabel("|S41| (dB)")
-    plt.title("S41 Magnitude (dB) for Each Port")
+    plt.ylabel("|S21| (dB)")
+    plt.title("S21 Magnitude (dB) for Each Port")
     plt.grid(True)
     plt.legend(ncol=4, fontsize=8)
     plt.tight_layout()
@@ -102,7 +100,7 @@ def plot_S41_phase(unwrap=True, interactive=False):
         labels.append(f"Port {i}")
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("Phase (degrees)")
-    plt.title("S41 Phase for Each Port" + (" (Unwrapped)" if unwrap else ""))
+    plt.title("S21 Phase for Each Port" + (" (Unwrapped)" if unwrap else ""))
     plt.grid(True)
     leg = plt.legend(ncol=4, fontsize=8,fancybox=True, shadow=False)
     plt.tight_layout()
@@ -165,8 +163,8 @@ def plot_S44_mag():
         mag_db = 20 * np.log10(np.abs(s44))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
     plt.xlabel("Frequency (GHz)")
-    plt.ylabel("|S44| (dB)")
-    plt.title("S44 Magnitude (dB) for Each Port")
+    plt.ylabel("|S22| (dB)")
+    plt.title("S22 Magnitude (dB) for Each Port")
     plt.grid(True)
     plt.legend(ncol=4, fontsize=8)
     plt.tight_layout()
@@ -220,7 +218,7 @@ def plot_relative_phase(unwrap=True, interactive=False):
 
     plt.xlabel("Frequency (GHz)")
     plt.ylabel("Relative Phase (degrees)")
-    plt.title("Relative S41 Phase (Referenced to Longest Path)")
+    plt.title("Relative S21 Phase (Referenced to Longest Path)")
     plt.grid(True)
     leg = plt.legend(ncol=4, fontsize=8, fancybox=True)
     plt.tight_layout()
@@ -255,6 +253,7 @@ def plot_relative_phase(unwrap=True, interactive=False):
 
 def main():
     # For testing purposes
+    read_s1p()
     plot_S11_mag()
     plot_S41_mag()
     plot_S44_mag()
