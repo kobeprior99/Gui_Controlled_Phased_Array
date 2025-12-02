@@ -416,7 +416,7 @@ def oam_page():
     @ui.page('/measure')
     def measure():
         #header
-        ui.label('Measure Hermite Gaussian Beams') \
+        ui.label('Measure Laguerre Gaussian Beams') \
             .classes('text-2xl font-bold text-center')
 
         ui.button('⬅ Back', on_click=nav_back)
@@ -435,7 +435,7 @@ def oam_page():
     def scattering_experiment():
         ui.button('⬅ Back', on_click=nav_back)
         #header
-        ui.label('Scattering Experiment Hermite Gaussian Beams') \
+        ui.label('Scattering Experiment Laguerre Gaussian Beams') \
             .classes('text-2xl font-bold text-center')
         ui.image('media/scat_instruct.png').style('width:30%')
         #Step 1: Choose Mode 
