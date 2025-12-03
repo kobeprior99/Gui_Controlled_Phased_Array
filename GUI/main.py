@@ -560,7 +560,7 @@ def oam_page():
             .classes('justify-center items-center')\
             .style('order:22; width:90%;')
 
-        comparison_container_plane=ui.row()\
+        comparison_container=ui.row()\
             .classes('justify-center items-center')\
             .style('order:25; width: 90%')
         
