@@ -497,7 +497,7 @@ def oam_page():
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
                 try:
-                    fig.update_yaxes(range=[0,800])
+                    fig.update_yaxes(range=[0,400])
                 except Exception:
                     pass #temporary invalid values
                 live_plot.update()  # NiceGUI triggers plot update
@@ -655,8 +655,8 @@ def oam_page():
                     ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
 
         def plot_comparison():
-            e_diff_plane = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
-            e_diff_structured = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+            e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
+            e_diff_plane = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
             x = np.arange(len(e_diff_structured))
 # Plot comparison
             plt.figure(figsize=(8,5))
@@ -868,7 +868,7 @@ def hermite_page():
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
                 try:
-                    fig.update_yaxes(range=[0,800])
+                    fig.update_yaxes(range=[0,400])
                 except Exception:
                     pass #temporary invalid values
                 live_plot.update()  # NiceGUI triggers plot update
@@ -1024,8 +1024,8 @@ def hermite_page():
                     ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
 
         def plot_comparison():
-            e_diff_plane = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy']
-            e_diff_structured = burst_data_hermite['scatterer_plane']['energy'] - burst_data_hermite['baseline']['energy']
+            e_diff_structured = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy']
+            e_diff_plane = burst_data_hermite['scatterer_plane']['energy'] - burst_data_hermite['baseline']['energy']
             x = np.arange(len(e_diff_structured))
 # Plot comparison
             plt.figure(figsize=(8,5))
@@ -1097,19 +1097,19 @@ def hermite_page():
              
             ui.button("Send Phases", on_click=lambda: send_phases_for_planewave(theta.value,phi.value))
     
-            #Step 7 Measure Scattering
-            ui.label("Step 7: Measure Scattering from Plane Wave").style('order: 16;')
-            ui.image('media/Step3.jpeg').style('order: 17; width: 30%;')
-            ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 18;')
+        #Step 7 Measure Scattering
+        ui.label("Step 7: Measure Scattering from Plane Wave").style('order: 16;')
+        ui.image('media/Step3.jpeg').style('order: 17; width: 30%;')
+        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 18;')
 
-            #Step 8 Perform Subtraction
-            ui.label("Step 8: Show Difference (Planewave - Basline Scattering)").style('order: 20;')
-            ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 21;')
+        #Step 8 Perform Subtraction
+        ui.label("Step 8: Show Difference (Planewave - Basline Scattering)").style('order: 20;')
+        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 21;')
 
-            #Step 9 Compre the plane wave illuminaiton and structured illumination scattering 
-            ui.label("Step 9: Compare the scattering under different illuminations").style('order: 23;')
-            ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 24;')
-            
+        #Step 9 Compre the plane wave illuminaiton and structured illumination scattering 
+        ui.label("Step 9: Compare the scattering under different illuminations").style('order: 23;')
+        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 24;')
+        
 
 
 #----Beam Steering----
