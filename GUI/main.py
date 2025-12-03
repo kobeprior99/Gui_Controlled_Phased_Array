@@ -228,7 +228,10 @@ def nav_back():
     '''
     navigate back and terminate transmission iff applicable
     ''' 
+    global selected
     stop_tx() #this checks if tx is active before terminating 
+    #for selected box on scattering experiment pages
+    selected = None
     ui.navigate.back()
 
 #----END HELPER FUNCTIONS----
@@ -687,7 +690,7 @@ def oam_page():
             else:
                 ui.notify('Sucessfully sent phases')
 
-# Step 3: measure baseline
+        # Step 3: measure baseline
         ui.label("Step 3: Measure Baseline").style('order: 1;')
         ui.image('media/Step2.jpeg').style('order: 2; width: 30%;')
         ui.button("Start", on_click=plot_no_scatterer).style('order: 3;')
@@ -892,6 +895,7 @@ def hermite_page():
             '''
             transmit a burst of continuous wave and record recieved "power"
             '''
+            global burst_data_hermite
             #start trasmission
             tx()
             time.sleep(SETTLE_TIME)
@@ -911,6 +915,7 @@ def hermite_page():
             }
             ui.notify("successfully recorded burst")
     
+        #Set up containers for images to be placed in later
         baseline_container=ui.row()\
             .classes('justify-center items-center')\
             .style('order:4; width:90%;')
@@ -919,12 +924,23 @@ def hermite_page():
             .style('order:8; width:90%;')
         difference_container=ui.row()\
             .classes('justify-center items-center')\
-        .style('order:11; width:90%;')
+            .style('order:11; width:90%;')
+        scatterer_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:19; width:90%;')
+        difference_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:22; width:90%;')
+
+        comparison_container=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:25; width: 90%')
         
         def plot_no_scatterer():
             '''
             Record burst data then plot it
             '''
+            global burst_data_hermite
             record_burst('baseline')
             e_b = burst_data_hermite['baseline']['energy']
             #number of samples
@@ -943,32 +959,48 @@ def hermite_page():
             with baseline_container:
                 ui.image('media/baseline.png').style('width:60%;').force_reload()
 
-        def plot_scatterer():
+        def plot_scatterer(plane=False):
             '''
             Record burst data then plot it 
             '''
-            record_burst('scatterer')
-            e_s = burst_data_hermite['scatterer']['energy']
+            global burst_data_hermite
+            if not plane:
+                record_burst('scatterer')
+                e_s = burst_data_hermite['scatterer']['energy']
+            else:
+                record_burst('scatterer_plane')
+                e_s = burst_data_hermite['scatterer_plane']['energy']
             #number of samples
             x = np.arange(len(e_s))
             plt.figure(figsize=(8,5))
             plt.plot(x[1:], e_s[1:], '-o', label='Average Power Recieved')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Scatterer')
+            plt.xlabel("Samples") 
+            plt.ylabel("Average Power Received") 
+            plt.title('Energy Burst Measurement - Scatterer') 
             plt.grid(True)
-            plt.savefig('media/scatterer_burst.png')
+            if not plane:
+                plt.savefig('media/scatterer_burst.png')
+            else:
+                plt.savefig('media/scatterer_burst_plane.png')
             plt.close()
             #update ui image
-            scatterer_container.clear()
-            with scatterer_container:
-                ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
+            if not plane:
+                scatterer_container.clear()
+                with scatterer_container:
+                    ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
+            else:
+                scatterer_container_plane.clear()
+                with scatterer_container_plane:
+                    ui.image('media/scatterer_burst_plane.png').style('width:60%').force_reload()
 
-        def plot_difference():
+        def plot_difference(plane =False):
             '''
             Plot scattered - baseline
             '''
-            e_diff = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy'] 
+            if not plane:
+                e_diff = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy'] 
+            else:
+                e_diff = burst_data_hermite['scatterer_plane']['energy'] - burst_data_hermite['baseline']['energy'] 
             x = np.arange(len(e_diff))
             plt.figure(figsize=(8,5))
             plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
@@ -976,12 +1008,56 @@ def hermite_page():
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Difference')
             plt.grid(True)
-            plt.savefig('media/power_diff.png')
+            if not plane:
+                plt.savefig('media/power_diff.png')
+            else:
+                plt.savefig('media/power_diff_plane.png')
             plt.close()
             #update ui image
-            difference_container.clear()
-            with difference_container:
-                ui.image('media/power_diff.png').style('width:60%;').force_reload()
+            if not plane:
+                difference_container.clear()
+                with difference_container:
+                    ui.image('media/power_diff.png').style('width:60%;').force_reload()
+            else:
+                difference_container_plane.clear()
+                with difference_container_plane:
+                    ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
+
+        def plot_comparison():
+            e_diff_plane = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy']
+            e_diff_structured = burst_data_hermite['scatterer_plane']['energy'] - burst_data_hermite['baseline']['energy']
+            x = np.arange(len(e_diff_structured))
+# Plot comparison
+            plt.figure(figsize=(8,5))
+            plt.plot(x[1:], e_diff_structured[1:], '-o', label='Scatterering from Structured Wave')
+            plt.plot(x[1:], e_diff_plane[1:], '-o', label='Scatterer Plane from Plane Wave')
+
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Difference")
+            plt.title("Energy Burst Measurement - Experiment Comparison")
+            plt.grid(True)
+            plt.legend(loc="best")
+
+            # Save to file
+            plt.savefig('media/power_diff_comparison.png')
+            plt.close()
+
+            # Update UI
+            comparison_container.clear()
+            with comparison_container:
+                ui.image('media/power_diff_comparison.png').style('width:60%;').force_reload()
+
+
+
+        def send_phases_for_planewave(theta, phi):
+
+            phases = runAF_Calc(DX,DY,theta, phi)
+            try: 
+                send_phases(phases)
+            except Exception as e:
+                ui.notify(f'Failed to send phases: {e}', color = 'red')
+            else:
+                ui.notify('Sucessfully sent phases')
 
 # Step 3: measure baseline
         ui.label("Step 3: Measure Baseline").style('order: 1;')
@@ -999,181 +1075,41 @@ def hermite_page():
         ui.label("Step 5: Show Difference").style('order: 9;')
         ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
         # difference_container has order: 11
-  
-#---- END Hermite ----
+        # Step 6: User estimate the angle to the scatterer given the coordinate system: 
+        ui.label("Step 6: Approximate Scatterer Location to Illuminate with Standard Plane Wave").style('order:12')
+        ui.label("Use the following coordinate system to define your angles").style('order:13')
+        with ui.row().classes('w-full justify-left items-center').style('order: 14'):
+            ui.image('media/Default_Array.png').style('width: 35%;')
+            ui.image('media/Default_Array2.png').style('width: 35%;')
 
+        with ui.row().classes('w-full justify-center items-center').style('order: 15;'):
+            theta = ui.number(
+                label = 'Theta (deg)',
+                value=0,
+                min = 0, max=90
+            ).style('width:20%')
 
-#----Beam Steering----
-@ui.page('/beam')
-def beam_page():
-    ui.button('⬅ Back', on_click=nav_back)
-    with ui.row().classes('w-full justify-center items-center'):
-        ui.button('Receive Mode', on_click=lambda: ui.navigate.to('/receive_mode')).\
-        classes('w-64 h-24 text-xl')
-        ui.button('Transmit Mode', on_click=lambda: ui.navigate.to('/transmit_mode')).\
-        classes('w-64 h-24 text-xl')
-
-    with ui.row().classes('w-full justify-center items-center'):
-        ui.image('media/Beam_Explanation.png')
+            phi = ui.number(
+                label = 'Phi (deg)',
+                value=0,
+                min = 0, max = 360
+            ).style('width:20%')
+             
+            ui.button("Send Phases", on_click=lambda: send_phases_for_planewave(theta.value,phi.value))
     
-    #----Sub Pages----    
+        #Step 7 Measure Scattering
+        ui.label("Step 7: Measure Scattering from Plane Wave").style('order: 16;')
+        ui.image('media/Step3.jpeg').style('order: 17; width: 30%;')
+        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 18;')
 
-    #----Transmit Mode ----
-    @ui.page('/transmit_mode')
-    def transmit_mode():
-        # Back button in the top-left
-        ui.button('⬅ Back', on_click=nav_back)
-        with ui.column().classes('w-full'):
-            # Header
-            ui.label('Transmit mode') \
-                .classes('text-2xl font-bold text-center')
-            with ui.row().classes('w-full justify-center items-center'):
-                ui.label('Please connect the phase shifting network\
-                with the following port order, then define your array parameters and steer angle')\
-                .classes('text-base text-gray-600 text-center')
+        #Step 8 Perform Subtraction
+        ui.label("Step 8: Show Difference (Planewave - Basline Scattering)").style('order: 20;')
+        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 21;')
 
-
-            with ui.row().classes('w-full justify-center items-center'):
-                ui.image('media/Default_Array.png').style('width: 35%;')
-                ui.image('media/Default_Array2.png').style('width: 35%;')
+        #Step 9 Compre the plane wave illuminaiton and structured illumination scattering 
+        ui.label("Step 9: Compare the scattering under different illuminations").style('order: 23;')
+        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 24;')
         
-
-            with ui.row().classes('w-full justify-center items-center'):
-                dx = ui.number(
-                    label = 'dx (λ)',
-                    value=DX,
-                    min=0.1
-                ).style('width:20%')
-
-                dy = ui.number(
-                    label = 'dy (λ)',
-                    value=DY,
-                    min=0.1
-                ).style('width:20%')
-
-                theta = ui.number(
-                    label = 'Theta (deg)',
-                    value=0,
-                    min = 0, max=90
-                ).style('width:20%')
-
-                phi = ui.number(
-                    label = 'Phi (deg)',
-                    value=0,
-                    min = 0, max = 360
-                ).style('width:20%')
-                 
-            with ui.row().classes('w-full justify-center items-center'):
-                y_min = ui.number(
-                    label ='Set Minimum Power for Graph',
-                    value=0,
-                    min=1
-                ).style('width:30%') 
-                y_max = ui.number(
-                    label ='Set Maximum Power for Graph',
-                    value=10,
-                    min=1
-                ).style('width:30%')
-
-            fig = go.Figure(
-                go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
-            )
-
-            fig.update_layout(
-                margin=dict(l=0, r=0, t=0, b=0),
-                xaxis_title='Time(s)',
-                yaxis_title='Avg Power Received'
-            )
-            live_plot = ui.plotly(fig).classes('w-3/4 h-64')
-            image_container = ui.row()\
-                .classes('justify-center items-center')\
-            .style('order:2; width:90%;')
-            stop_event = asyncio.Event()
-            
-            
-            def start_live_plot():
-                # Send initial phases
-                phases = runAF_Calc(dx.value, dy.value, theta.value, phi.value)
-                send_phases(phases)
-
-                # Show AF image
-                image_container.clear()
-                with image_container:
-
-                    ui.image('media/AF.png').style('width:40%;').force_reload()
-                    ui.image('media/uv.png').style('width:40%;').force_reload()
-                # Start continuous TX
-                tx()
-
-                # Reset stop_event
-                stop_event.clear()
-
-                # Launch async update
-                asyncio.create_task(live_update())
-                new_angle_button.visible = True
-                stop_button.visible = True
-
-            async def live_update():
-                t_values = []
-                energy_values = []
-                start_time = time.time()
-                last_theta = theta.value 
-                last_phi = phi.value
-
-                while not stop_event.is_set():
-                    t = time.time()-start_time
-                    energy = get_energy()  # sample SDR
-                    t_values.append(t)
-                    energy_values.append(energy)
-                    t_values = t_values[-100:]
-                    energy_values = energy_values[-100:]
-                    # Update the figure's data
-                    fig.data[0].x = t_values
-                    fig.data[0].y = energy_values
-                    try:
-                        fig.update_yaxes(range=[int(y_min.value),int(y_max.value)])
-                    except Exception:
-                        pass #temporary invalid values
-                    live_plot.update()  # NiceGUI triggers plot update
-
-                    await asyncio.sleep(0.05)  # ~20 Hz refresh
-            def send_current_phase():
-                phases = runAF_Calc(
-                    dx.value, 
-                    dy.value, 
-                    theta.value,
-                    phi.value
-                )
-                send_phases(phases)
-                # Show AF image
-                image_container.clear()
-                with image_container:
-                    ui.image('media/AF.png')\
-                    .style('width:40%;')\
-                    .force_reload()
-                    ui.image('media/uv.png')\
-                    .style('width:40%;')\
-                    .force_reload()
-
-            def stop_live():
-                #stop transmitting 
-                stop_tx()
-                stop_event.set()
-                ui.notify("Live plot stopped", type='positive')
-
-            # Buttons
-            ui.button('Transmit & Live Plot', on_click=start_live_plot)
-            new_angle_button = ui.button(
-                'New Angle', 
-                on_click = send_current_phase
-            ) 
-            new_angle_button.visible = False
-
-            stop_button = ui.button(
-                'Stop',
-                on_click=stop_live
-            )
-            stop_button.visible = False            
     #----END transmit page----
 
 
