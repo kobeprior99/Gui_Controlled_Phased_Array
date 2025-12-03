@@ -45,8 +45,9 @@ PHASE_CORRECTED = False
 phase_inputs = [] 
 #for highlighting selected mode hg lg section 
 selected = None
-
-
+#for scattering experiment global dictionary
+burst_data_oam = {}
+burst_data_hermite ={}
 #----HELPER FUNCTIONS----
 def update_phase(index:int, value:int):
     global PHASE_CORRECTED, PHASE_OFFSETS
@@ -516,11 +517,11 @@ def oam_page():
         stop_button.visible = False            
 
 
-        burst_data = {}
         def record_burst(trial_name, duration=1.0, sample_interval=0.01):
             '''
             transmit a burst of continuous wave and record recieved "power"
             '''
+            global burst_data_oam
             #start trasmission
             tx()
             time.sleep(SETTLE_TIME)
@@ -535,11 +536,12 @@ def oam_page():
             #end transmission
             stop_tx()
             #store the data
-            burst_data[trial_name] ={
+            burst_data_oam[trial_name] ={
                 'energy': np.array(energy_values)
             }
             ui.notify("successfully recorded burst")
     
+        #Set up containers for images to be placed in later
         baseline_container=ui.row()\
             .classes('justify-center items-center')\
             .style('order:4; width:90%;')
@@ -549,13 +551,26 @@ def oam_page():
         difference_container=ui.row()\
             .classes('justify-center items-center')\
             .style('order:11; width:90%;')
+
+        scatterer_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:19; width:90%;')
+
+        difference_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:22; width:90%;')
+
+        comparison_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:25; width: 90%')
         
         def plot_no_scatterer():
             '''
             Record burst data then plot it
             '''
+            global burst_data_oam
             record_burst('baseline')
-            e_b = burst_data['baseline']['energy']
+            e_b = burst_data_oam['baseline']['energy']
             #number of samples
             x = np.arange(len(e_b))
 
@@ -572,32 +587,48 @@ def oam_page():
             with baseline_container:
                 ui.image('media/baseline.png').style('width:60%;').force_reload()
 
-        def plot_scatterer():
+        def plot_scatterer(plane=False):
             '''
             Record burst data then plot it 
             '''
-            record_burst('scatterer')
-            e_s = burst_data['scatterer']['energy']
+            global burst_data_oam
+            if not plane:
+                record_burst('scatterer')
+                e_s = burst_data_oam['scatterer']['energy']
+            else:
+                record_burst('scatterer_plane')
+                e_s = burst_data_oam['scatterer_plane']['energy']
             #number of samples
             x = np.arange(len(e_s))
             plt.figure(figsize=(8,5))
             plt.plot(x[1:], e_s[1:], '-o', label='Average Power Recieved')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Scatterer')
+            plt.xlabel("Samples") 
+            plt.ylabel("Average Power Received") 
+            plt.title('Energy Burst Measurement - Scatterer') 
             plt.grid(True)
-            plt.savefig('media/scatterer_burst.png')
+            if not plane:
+                plt.savefig('media/scatterer_burst.png')
+            else:
+                plt.savefig('media/scatterer_burst_plane.png')
             plt.close()
             #update ui image
-            scatterer_container.clear()
-            with scatterer_container:
-                ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
+            if not plane:
+                scatterer_container.clear()
+                with scatterer_container:
+                    ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
+            else:
+                scatterer_container_plane.clear()
+                with scatterer_container_plane:
+                    ui.image('media/scatterer_burst_plane.png').style('width:60%').force_reload()
 
-        def plot_difference():
+        def plot_difference(plane =False):
             '''
             Plot scattered - baseline
             '''
-            e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
+            if not plane:
+                e_diff = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy'] 
+            else:
+                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy'] 
             x = np.arange(len(e_diff))
             plt.figure(figsize=(8,5))
             plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
@@ -605,12 +636,56 @@ def oam_page():
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Difference')
             plt.grid(True)
-            plt.savefig('media/power_diff.png')
+            if not plane:
+                plt.savefig('media/power_diff.png')
+            else:
+                plt.savefig('media/power_diff_plane.png')
             plt.close()
             #update ui image
-            difference_container.clear()
-            with difference_container:
-                ui.image('media/power_diff.png').style('width:60%;').force_reload()
+            if not plane:
+                difference_container.clear()
+                with difference_container:
+                    ui.image('media/power_diff.png').style('width:60%;').force_reload()
+            else:
+                difference_container_plane.clear()
+                with difference_container_plane:
+                    ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
+
+        def plot_comparison():
+            e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
+            e_diff_structured = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+            x = np.arange(len(e_diff_structured))
+# Plot comparison
+            plt.figure(figsize=(8,5))
+            plt.plot(x[1:], e_diff_structured[1:], '-o', label='Scatterering from Structured Wave')
+            plt.plot(x[1:], e_diff_plane[1:], '-o', label='Scatterer Plane from Plane Wave')
+
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Difference")
+            plt.title("Energy Burst Measurement - Experiment Comparison")
+            plt.grid(True)
+            plt.legend(loc="best")
+
+            # Save to file
+            plt.savefig('media/power_diff_comparison.png')
+            plt.close()
+
+            # Update UI
+            comparison_container.clear()
+            with comparison_container:
+                ui.image('media/power_diff_comparison.png').style('width:60%;').force_reload()
+
+
+
+        def send_phases_for_planewave(theta, phi):
+
+            phases = runAF_Calc(DX,DY,theta, phi)
+            try: 
+                send_phases(phases)
+            except Exception as e:
+                ui.notify(f'Failed to send phases: {e}', color = 'red')
+            else:
+                ui.notify('Sucessfully sent phases')
 
 # Step 3: measure baseline
         ui.label("Step 3: Measure Baseline").style('order: 1;')
@@ -628,8 +703,45 @@ def oam_page():
         ui.label("Step 5: Show Difference").style('order: 9;')
         ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
         # difference_container has order: 11
+        # Step 6: User estimate the angle to the scatterer given the coordinate system: 
+        ui.label("Step 6: Approximate Scatterer Location to Illuminate with Standard Plane Wave").style('order:12')
+        ui.label("Use the following coordinate system to define your angles").style('order:13')
+        with ui.row().classes('w-full justify-left items-center').style('order: 14'):
+            ui.image('media/Default_Array.png').style('width: 35%;')
+            ui.image('media/Default_Array2.png').style('width: 35%;')
+
+        with ui.row().classes('w-full justify-center items-center').style('order: 15;'):
+            theta = ui.number(
+                label = 'Theta (deg)',
+                value=0,
+                min = 0, max=90
+            ).style('width:20%')
+
+            phi = ui.number(
+                label = 'Phi (deg)',
+                value=0,
+                min = 0, max = 360
+            ).style('width:20%')
+             
+            ui.button("Send Phases", on_click=lambda: send_phases_for_planewave(theta.value,phi.value))
+    
+        #Step 7 Measure Scattering
+        ui.label("Step 7: Measure Scattering from Plane Wave").style('order: 16;')
+        ui.image('media/Step3.jpeg').style('order: 17; width: 30%;')
+        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 18;')
+
+        #Step 8 Perform Subtraction
+        ui.label("Step 8: Show Difference (Planewave - Basline Scattering)").style('order: 20;')
+        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 21;')
+
+        #Step 9 Compre the plane wave illuminaiton and structured illumination scattering 
+        ui.label("Step 9: Compare the scattering under different illuminations").style('order: 23;')
+        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 24;')
+        
 
 #----END OAM MODE ----
+
+
 
 
 #----HERMITE PAGE-----
@@ -776,7 +888,6 @@ def hermite_page():
         stop_button.visible = False            
 
 
-        burst_data = {}
         def record_burst(trial_name, duration=1.0, sample_interval=0.01):
             '''
             transmit a burst of continuous wave and record recieved "power"
@@ -795,7 +906,7 @@ def hermite_page():
             #end transmission
             stop_tx()
             #store the data
-            burst_data[trial_name] ={
+            burst_data_hermite[trial_name] ={
                 'energy': np.array(energy_values)
             }
             ui.notify("successfully recorded burst")
@@ -815,7 +926,7 @@ def hermite_page():
             Record burst data then plot it
             '''
             record_burst('baseline')
-            e_b = burst_data['baseline']['energy']
+            e_b = burst_data_hermite['baseline']['energy']
             #number of samples
             x = np.arange(len(e_b))
 
@@ -837,7 +948,7 @@ def hermite_page():
             Record burst data then plot it 
             '''
             record_burst('scatterer')
-            e_s = burst_data['scatterer']['energy']
+            e_s = burst_data_hermite['scatterer']['energy']
             #number of samples
             x = np.arange(len(e_s))
             plt.figure(figsize=(8,5))
@@ -857,7 +968,7 @@ def hermite_page():
             '''
             Plot scattered - baseline
             '''
-            e_diff = burst_data['scatterer']['energy'] - burst_data['baseline']['energy'] 
+            e_diff = burst_data_hermite['scatterer']['energy'] - burst_data_hermite['baseline']['energy'] 
             x = np.arange(len(e_diff))
             plt.figure(figsize=(8,5))
             plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
