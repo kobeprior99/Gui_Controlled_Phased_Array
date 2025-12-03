@@ -652,7 +652,7 @@ def oam_page():
                     ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
 
         def plot_comparison():
-            e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
+            e_diff_plane = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
             e_diff_structured = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
             x = np.arange(len(e_diff_structured))
 # Plot comparison
