@@ -20,3 +20,17 @@ add iio_info to path:
         which iio_info
 pip3 install pyadi-iio
 
+
+
+Hardware Setup:
+Plug Arduino and Pluto SDR into Computer
+Connect Pins from Arduino -> Phase Shifter
+5V -> 5V
+GND -> GND
+51 -> SI 
+52 -> CL
+53 -> LE
+
+#define SI_PIN   51  // MOSI
+#define CLK_PIN  52  // SCK
+#define LE_PIN   53  // SS
