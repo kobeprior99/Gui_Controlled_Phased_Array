@@ -21,6 +21,7 @@
 
                Designed for educational and research applications in phased array
                beamforming and the generation of structured waveforms.
+
 ===============================================================================
 """
 #import all necessary libraries
@@ -455,6 +456,19 @@ def oam_page():
         ui.image('media/Step1.jpeg').style('width:30%')  
 
         #live tx plot 
+        
+        with ui.row().classes('w-full justify-center items-center'):
+            y_min = ui.number(
+                label ='Set Minimum Power for Graph',
+                value=0,
+                min=1
+            ).style('width:30%') 
+            y_max = ui.number(
+                label ='Set Maximum Power for Graph',
+                value=10,
+                min=1
+            ).style('width:30%')
+
         fig = go.Figure(
             go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
         )
@@ -497,7 +511,7 @@ def oam_page():
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
                 try:
-                    fig.update_yaxes(range=[0,400])
+                    fig.update_yaxes(range=[y_min.value,y_max.value])
                 except Exception:
                     pass #temporary invalid values
                 live_plot.update()  # NiceGUI triggers plot update
@@ -825,6 +839,18 @@ def hermite_page():
         ui.label('Step2: Confirm Main Beam Direction')
         ui.image('media/Step1.jpeg').style('width:30%')  
 
+        with ui.row().classes('w-full justify-center items-center'):
+            y_min = ui.number(
+                label ='Set Minimum Power for Graph',
+                value=0,
+                min=1
+            ).style('width:30%') 
+            y_max = ui.number(
+                label ='Set Maximum Power for Graph',
+                value=10,
+                min=1
+            ).style('width:30%')
+
         #live tx plot 
         fig = go.Figure(
             go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
@@ -868,7 +894,7 @@ def hermite_page():
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
                 try:
-                    fig.update_yaxes(range=[0,400])
+                    fig.update_yaxes(range=[y_min.value,y_max.value])
                 except Exception:
                     pass #temporary invalid values
                 live_plot.update()  # NiceGUI triggers plot update
