@@ -396,7 +396,7 @@ def oam_page():
         classes('w-64 h-24 text-xl')
 
     images = [
-    ('-3', 'oam-3.png'),
+    ('-3', 'oam--3.png'),
     ('-2', 'oam-2.png'), 
     ('-1', 'oam-1.png'),
     ('1', 'oam1.png'),
@@ -414,7 +414,7 @@ def oam_page():
         #add red boarder to new image
         image_elements[t].classes('ring-4 ring-red-500')
         selected = t
-        #call function to transmit that hermite mode
+        #call function to transmit that oam mode
         oam_mode(t)
 
     @ui.page('/measure')
@@ -682,7 +682,7 @@ def oam_page():
 
         def send_phases_for_planewave(theta, phi):
 
-            phases = runAF_Calc(DX,DY,theta, phi)
+            phases = runAF_Calc(DX, DY, theta, phi)
             try: 
                 send_phases(phases)
             except Exception as e:

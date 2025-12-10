@@ -2,13 +2,20 @@ import numpy as np
 #contains constants used throughout the program
 BAUDRATE = 115200 
 C = 299792458 #m/s 
+FREQ = int(2.1e9)
+LAMBDA = C/FREQ
 NUM_ELEMENTS = 16
 NSIDE = 4
 
 #RX grid 
 #default element spacing in terms of lambda 
-DX =0.35 
-DY =0.41
+dx_m = 48.3e-3
+dy_m = 56.4e-3
+
+##dx dy in wavelengths is:
+DX = dx_m/LAMBDA 
+DY = dy_m/LAMBDA
+
 #We're limited to the resolution of our array, the half power beam width is rather large
 num_theta = 8
 num_phi = 32
@@ -19,7 +26,6 @@ PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
 #Total of 256 locations to scan through
 
 #PLUTO config
-FREQ = int(2.1e9)
 BASE_BAND = 100e3
 SAMP_RATE = 5e6  # Hz
 TX_GAIN = -2 #dBm
