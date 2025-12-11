@@ -34,3 +34,6 @@ RX_GAIN =15 #adjust as needed
 BUFFER_SIZE = 2048 
 NUM_AVG = 4
 SETTLE_TIME = 1 #time to transmit before capturing burst
+
+#calibration directory
+S2PDIR = 'S2P-12-11'

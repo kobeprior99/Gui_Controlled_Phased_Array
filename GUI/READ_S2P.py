@@ -12,13 +12,13 @@ Generate useful plots
 
 """
 import os
-from config import FREQ
+from config import FREQ, S2PDIR
 import matplotlib.pyplot as plt
 import numpy as np
 from pathlib import Path
 
 # change directory of s2p files here
-S2P_DIR = Path("S2P_11-20") #directory containing port data
+s2p_dir = Path(S2PDIR) #directory containing port data
 # Cycle through multiple line styles
 LINE_STYLE = ['-']
 def read_s2p(filepath: Path):
@@ -53,7 +53,7 @@ def get_phase_at_freq() -> np.ndarray:
     '''
     phases = []
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
         # Find the closest frequency index
         idx = np.argmin(np.abs(freqs - FREQ))
@@ -68,7 +68,7 @@ def plot_S41_mag():
     '''Plot |S41| (in dB) for each port on the same graph'''
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s41))
         #pick linestyle based on index
@@ -90,7 +90,7 @@ def plot_S41_phase(unwrap=True, interactive=False):
     plt.figure(figsize=(10, 6))
 
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
         phase_deg = np.angle(s41, deg=True)
         if unwrap:
@@ -141,7 +141,7 @@ def plot_S11_mag():
     '''Plot |S11| (in dB) for each port on the same graph'''
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, s11, _, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s11))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
@@ -158,7 +158,7 @@ def plot_S44_mag():
     '''Plot |S44| (in dB) for each port on the same graph'''
     plt.figure(figsize=(10, 6))
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, _, _, s44 = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s44))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
@@ -179,7 +179,7 @@ def plot_relative_phase(unwrap=True, interactive=False):
 
     # --- Load all phases first ---
     for i in range(1, 17):
-        file = S2P_DIR / f"Port{i}.s2p"
+        file = s2p_dir / f"Port{i}.s2p"
         freqs, _, s41, _ = read_s2p(file)
 
         if freqs_ref is None:
