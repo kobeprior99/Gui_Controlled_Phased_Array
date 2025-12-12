@@ -17,10 +17,10 @@
 #define LE_PIN   53  // SS
 
 #define NUM_ELEMENTS 16
-const float PHASE_STEP = 1.40625;
 
 // ------------Variables------------------
 uint8_t phase;
+uint8_t phases[NUM_ELEMENTS];
 bool phaseOPT = 0;
 uint8_t addr;
 uint16_t control_word;
@@ -32,7 +32,7 @@ uint8_t le_bit;
 // -------------Setup----------------------
 void setup() {
   Serial.begin(115200);
-
+  while(!Serial);
   pinMode(LE_PIN, OUTPUT);
   digitalWrite(LE_PIN, LOW);
 
@@ -42,22 +42,32 @@ void setup() {
 
   // Setup SPI
   SPI.begin();
-  SPI.beginTransaction(SPISettings(8000000, LSBFIRST, SPI_MODE0)); // 8 MHz, MSB first, mode 0
+  SPI.beginTransaction(SPISettings(8000000, LSBFIRST, SPI_MODE0)); // 8 MHz, LSB first, mode 0
+
 }
 
 // -------------Main Loop------------------
 void loop() {
   // Wait until we have NUM_ELEMENTS bytes from Serial
   if (Serial.available() >= NUM_ELEMENTS) {
+    Serial.readBytes(phases,NUM_ELEMENTS);//more bullet proof
+    //debug: repeat back control word
+    //uint16_t control_debug[NUM_ELEMENTS];
     for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
-      phase = Serial.read();
+      phase = phases[i];
       // OPT bit mirrors 90 degree bit
-      phaseOPT = (phase >> 7) & 0x1;
+      phaseOPT = (phase >> 6) & 0x1;
       addr = (i & 0xF);
       control_word = (addr << 9) | (phaseOPT << 8) | phase;
-
+      //control_debug[i] = control_word << 3;
       sendControlWord(control_word);
     }
+    //debug repeat back
+    // Send each 16-bit word as 2 bytes (low byte, high byte)
+    // for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
+    //    Serial.write(control_debug[i] & 0xFF);        // Low byte
+    //    Serial.write((control_debug[i] >> 8) & 0xFF); // High byte
+    //  }
   }
 }
 
@@ -70,13 +80,12 @@ void sendControlWord(uint16_t word) {
    */
 
   uint16_t tx_word = word << 3; // Align 13-bit word into MSBs of 16-bit transfer
-
+  
   // Transfer 16 bits via SPI
   SPI.transfer16(tx_word);
-  //this is clever we send 16 bits but on ly the 13 closest to the latch enable are stored into the register.
-
+  //this is clever we send 16 bits but only the 13 closest to the latch enable are stored into the register.
   // Pulse LE (latch enable)
-  *le_port |= le_bit;  // LE high
-  asm volatile ("nop\n\t""nop\n\t"); // tiny delay to meet tLE timing
-  *le_port &= ~le_bit; // LE low
+   *le_port |= le_bit;  // LE high
+   asm volatile ("nop\n\t""nop\n\t"); // tiny delay to meet tLE timing
+   *le_port &= ~le_bit; // LE low
 }

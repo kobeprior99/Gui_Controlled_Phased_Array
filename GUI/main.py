@@ -137,9 +137,20 @@ def send_phases(phases: np.ndarray):
     #scales degrees 0-360 to phase_words 0-255
     #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
     #adding 0.5 ensures when type conversion happens we round to the nearest integer instead of truncating
-    hardware_phases = np.uint8(((phases + PHASE_OFFSETS) * (255/360)) + 0.5)
+    hardware_phases = np.uint8(np.round((phases + PHASE_OFFSETS) * (256/360)))
     #send the phases
     ser.write(hardware_phases.tobytes()) 
+    #ser.flush()
+    # print(f'hardwarephases: {hardware_phases}')
+
+    # #debug: echo
+    # echo = ser.read(32)  # 16 words × 2 bytes each
+    # control_words = np.frombuffer(echo, dtype=np.uint16)
+    # print(f"Control words: {[f'0x{w:04x}' for w in control_words]}")
+    # if echo != hardware_phases.tobytes():
+    #     print('WARNING: PHASE missmatch detected')
+    # else:
+    #     print(f'echo{echo.hex(' ')}')
 
 
 def hermite_mode(mode:str):
@@ -359,9 +370,11 @@ def manual_page():
 
     def submit(sliders):
         #ensure integer values
-        values = np.array([s.value for s in sliders])
+        print('enter submit button')
+        values = np.array([float(s.value) for s in sliders])
+        
         #debug 
-        #print(f'values are {values}')
+        print(f'values are {values}')
         #SEND values to arduino
         try: 
             send_phases(values)
@@ -1436,7 +1449,7 @@ def calibrate():
     ui.button('⬅ Back', on_click=ui.navigate.back)
     #start by sending 0 phase to each port 
     try: 
-        send_phases(np.zeros(16))
+        send_phases(np.zeros(16,dtype=int))
     except Exception as e:
         ui.notify(f'Failed to send phases: {e}', color = 'red')
     else:
