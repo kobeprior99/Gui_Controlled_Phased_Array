@@ -56,7 +56,9 @@ def get_energy() -> float:
         power+= np.mean(np.abs(rx)**2)
     power /= NUM_AVG
     return power
-
+def moving_average(x, window=8):
+    x = np.asarray(x)
+    return np.convolve(x, np.ones(window)/window, mode='valid')
 # --- Example usage ---
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
@@ -87,3 +89,4 @@ if __name__ == "__main__":
     plt.show()
     stop_tx()
     sdr = None
+

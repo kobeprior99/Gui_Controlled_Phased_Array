@@ -34,7 +34,7 @@ import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, tx, stop_tx
+from PLUTO import get_energy, tx, stop_tx, moving_average
 import plotly.graph_objects as go
 #global serial handler
 ser = None
@@ -595,32 +595,38 @@ def oam_page():
             .style('order:25; width: 90%')
         
         def plot_no_scatterer():
-            '''
-            Record burst data then plot it
-            '''
+            ''' Record burst data then plot it '''
             global burst_data_oam
             record_burst('baseline')
             e_b = burst_data_oam['baseline']['energy']
-            #number of samples
+            
+            # Calculate average
+            e_b_avg = np.mean(e_b[1:])
+            
+            # Number of samples
             x = np.arange(len(e_b))
-
+            
             plt.figure(figsize=(8,5))
-            plt.plot(x[1:], e_b[1:], '-o', label='Average Power Recieved')
+            # Plot individual samples with reduced opacity
+            plt.plot(x[1:], e_b[1:], '-o', alpha=0.3, label='Individual Samples')
+            # Plot average line
+            plt.axhline(y=e_b_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_b_avg:.4f}')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Baseline')
             plt.grid(True)
+            plt.legend(loc='best')
             plt.savefig('media/baseline.png')
             plt.close()
-            #update ui image
+            
+            # Update ui image
             baseline_container.clear()
             with baseline_container:
                 ui.image('media/baseline.png').style('width:60%;').force_reload()
 
+
         def plot_scatterer(plane=False):
-            '''
-            Record burst data then plot it 
-            '''
+            ''' Record burst data then plot it '''
             global burst_data_oam
             if not plane:
                 record_burst('scatterer')
@@ -628,20 +634,31 @@ def oam_page():
             else:
                 record_burst('scatterer_plane')
                 e_s = burst_data_oam['scatterer_plane']['energy']
-            #number of samples
+            
+            # Calculate average
+            e_s_avg = np.mean(e_s[1:])
+            
+            # Number of samples
             x = np.arange(len(e_s))
+            
             plt.figure(figsize=(8,5))
-            plt.plot(x[1:], e_s[1:], '-o', label='Average Power Recieved')
-            plt.xlabel("Samples") 
-            plt.ylabel("Average Power Received") 
-            plt.title('Energy Burst Measurement - Scatterer') 
+            # Plot individual samples with reduced opacity
+            plt.plot(x[1:], e_s[1:], '-o', alpha=0.3, label='Individual Samples')
+            # Plot average line
+            plt.axhline(y=e_s_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_s_avg:.4f}')
+            plt.xlabel("Samples")
+            plt.ylabel("Average Power Received")
+            plt.title('Energy Burst Measurement - Scatterer')
             plt.grid(True)
+            plt.legend(loc='best')
+            
             if not plane:
                 plt.savefig('media/scatterer_burst.png')
             else:
                 plt.savefig('media/scatterer_burst_plane.png')
             plt.close()
-            #update ui image
+            
+            # Update ui image
             if not plane:
                 scatterer_container.clear()
                 with scatterer_container:
@@ -651,27 +668,37 @@ def oam_page():
                 with scatterer_container_plane:
                     ui.image('media/scatterer_burst_plane.png').style('width:60%').force_reload()
 
-        def plot_difference(plane =False):
-            '''
-            Plot scattered - baseline
-            '''
+
+        def plot_difference(plane=False):
+            ''' Plot scattered - baseline '''
             if not plane:
-                e_diff = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy'] 
+                e_diff = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
             else:
-                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy'] 
+                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+            
+            # Calculate average
+            e_diff_avg = np.mean(e_diff[1:])
+            
             x = np.arange(len(e_diff))
+            
             plt.figure(figsize=(8,5))
-            plt.plot(x[1:], e_diff[1:], '-o', label='Average Power Recieved')
+            # Plot individual samples with reduced opacity
+            plt.plot(x[1:], e_diff[1:], '-o', alpha=0.3, label='Individual Samples')
+            # Plot average line
+            plt.axhline(y=e_diff_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_diff_avg:.4f}')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
             plt.title('Energy Burst Measurement - Difference')
             plt.grid(True)
+            plt.legend(loc='best')
+            
             if not plane:
                 plt.savefig('media/power_diff.png')
             else:
                 plt.savefig('media/power_diff_plane.png')
             plt.close()
-            #update ui image
+            
+            # Update ui image
             if not plane:
                 difference_container.clear()
                 with difference_container:
@@ -681,31 +708,41 @@ def oam_page():
                 with difference_container_plane:
                     ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
 
+
         def plot_comparison():
             e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
             e_diff_plane = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+            
+            # Calculate averages
+            e_diff_structured_avg = np.mean(e_diff_structured[1:])
+            e_diff_plane_avg = np.mean(e_diff_plane[1:])
+            
             x = np.arange(len(e_diff_structured))
-# Plot comparison
+            
+            # Plot comparison
             plt.figure(figsize=(8,5))
-            plt.plot(x[1:], e_diff_structured[1:], '-o', label='Scatterering from Structured Wave')
-            plt.plot(x[1:], e_diff_plane[1:], '-o', label='Scatterer Plane from Plane Wave')
-
+            # Plot individual samples with reduced opacity
+            plt.plot(x[1:], e_diff_structured[1:], '-o', alpha=0.3, color='C0', label='Structured Wave (samples)')
+            plt.plot(x[1:], e_diff_plane[1:], '-o', alpha=0.3, color='C1', label='Plane Wave (samples)')
+            # Plot average lines
+            plt.axhline(y=e_diff_structured_avg, color='C0', linestyle='--', linewidth=2, 
+                        label=f'Structured Avg: {e_diff_structured_avg:.4f}')
+            plt.axhline(y=e_diff_plane_avg, color='C1', linestyle='--', linewidth=2, 
+                        label=f'Plane Avg: {e_diff_plane_avg:.4f}')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Difference")
             plt.title("Energy Burst Measurement - Experiment Comparison")
             plt.grid(True)
             plt.legend(loc="best")
-
+            
             # Save to file
             plt.savefig('media/power_diff_comparison.png')
             plt.close()
-
+            
             # Update UI
             comparison_container.clear()
             with comparison_container:
                 ui.image('media/power_diff_comparison.png').style('width:60%;').force_reload()
-
-
 
         def send_phases_for_planewave(theta, phi):
 
