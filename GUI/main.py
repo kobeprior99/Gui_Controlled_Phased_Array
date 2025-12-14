@@ -571,7 +571,7 @@ def oam_page():
             }
             ui.notify("successfully recorded burst")
     
-        #Set up containers for images to be placed in later
+#Set up containers for images to be placed in later
         baseline_container=ui.row()\
             .classes('justify-center items-center')\
             .style('order:4; width:90%;')
@@ -582,23 +582,35 @@ def oam_page():
             .classes('justify-center items-center')\
             .style('order:11; width:90%;')
 
+        baseline_container_plane=ui.row()\
+            .classes('justify-center items-center')\
+            .style('order:17; width:90%;')
+
         scatterer_container_plane=ui.row()\
             .classes('justify-center items-center')\
-            .style('order:19; width:90%;')
+            .style('order:21; width:90%;')
 
         difference_container_plane=ui.row()\
             .classes('justify-center items-center')\
-            .style('order:22; width:90%;')
+            .style('order:24; width:90%;')
 
         comparison_container=ui.row()\
             .classes('justify-center items-center')\
-            .style('order:25; width: 90%')
+            .style('order:27; width: 90%')
         
-        def plot_no_scatterer():
+        def plot_no_scatterer(plane=False):
             ''' Record burst data then plot it '''
             global burst_data_oam
-            record_burst('baseline')
-            e_b = burst_data_oam['baseline']['energy']
+            if not plane:
+                record_burst('baseline')
+                e_b = burst_data_oam['baseline']['energy']
+                title_suffix = 'Baseline (Structured Wave)'
+                save_path = 'media/baseline.png'
+            else:
+                record_burst('baseline_plane')
+                e_b = burst_data_oam['baseline_plane']['energy']
+                title_suffix = 'Baseline (Plane Wave)'
+                save_path = 'media/baseline_plane.png'
             
             # Calculate average
             e_b_avg = np.mean(e_b[1:])
@@ -613,16 +625,21 @@ def oam_page():
             plt.axhline(y=e_b_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_b_avg:.4f}')
             plt.xlabel("Samples")
             plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Baseline')
+            plt.title(f'Energy Burst Measurement - {title_suffix}')
             plt.grid(True)
             plt.legend(loc='best')
-            plt.savefig('media/baseline.png')
+            plt.savefig(save_path)
             plt.close()
             
             # Update ui image
-            baseline_container.clear()
-            with baseline_container:
-                ui.image('media/baseline.png').style('width:60%;').force_reload()
+            if not plane:
+                baseline_container.clear()
+                with baseline_container:
+                    ui.image('media/baseline.png').style('width:60%;').force_reload()
+            else:
+                baseline_container_plane.clear()
+                with baseline_container_plane:
+                    ui.image('media/baseline_plane.png').style('width:60%;').force_reload()
 
 
         def plot_scatterer(plane=False):
@@ -674,7 +691,7 @@ def oam_page():
             if not plane:
                 e_diff = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
             else:
-                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline_plane']['energy']
             
             # Calculate average
             e_diff_avg = np.mean(e_diff[1:])
@@ -711,7 +728,7 @@ def oam_page():
 
         def plot_comparison():
             e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
-            e_diff_plane = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline']['energy']
+            e_diff_plane = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline_plane']['energy']
             
             # Calculate averages
             e_diff_structured_avg = np.mean(e_diff_structured[1:])
@@ -754,22 +771,23 @@ def oam_page():
             else:
                 ui.notify('Sucessfully sent phases')
 
-        # Step 3: measure baseline
-        ui.label("Step 3: Measure Baseline").style('order: 1;')
+        # Step 3: measure baseline (structured wave)
+        ui.label("Step 3: Measure Baseline (Structured Wave)").style('order: 1;')
         ui.image('media/Step2.jpeg').style('order: 2; width: 30%;')
         ui.button("Start", on_click=plot_no_scatterer).style('order: 3;')
         # baseline_container has order: 4
 
-        # Step 4: measure scattering
-        ui.label("Step 4: Measure Scattering").style('order: 5;')
+        # Step 4: measure scattering (structured wave)
+        ui.label("Step 4: Measure Scattering (Structured Wave)").style('order: 5;')
         ui.image('media/Step3.jpeg').style('order: 6; width: 30%;')
         ui.button("Start", on_click=plot_scatterer).style('order: 7;')
         # scatterer_container has order: 8
 
-        # Step 5: show difference
-        ui.label("Step 5: Show Difference").style('order: 9;')
+        # Step 5: show difference (structured wave)
+        ui.label("Step 5: Show Difference (Structured Wave)").style('order: 9;')
         ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
         # difference_container has order: 11
+
         # Step 6: User estimate the angle to the scatterer given the coordinate system: 
         ui.label("Step 6: Approximate Scatterer Location to Illuminate with Standard Plane Wave").style('order:12')
         ui.label("Use the following coordinate system to define your angles").style('order:13')
@@ -792,18 +810,26 @@ def oam_page():
              
             ui.button("Send Phases", on_click=lambda: send_phases_for_planewave(theta.value,phi.value))
     
-        #Step 7 Measure Scattering
-        ui.label("Step 7: Measure Scattering from Plane Wave").style('order: 16;')
-        ui.image('media/Step3.jpeg').style('order: 17; width: 30%;')
-        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 18;')
+        # Step 7: Measure baseline (plane wave)
+        ui.label("Step 7: Measure Baseline (Plane Wave)").style('order: 16;')
+        ui.button("Start", on_click=lambda:plot_no_scatterer(plane=True)).style('order: 16;')
+        # baseline_container_plane has order: 17
 
-        #Step 8 Perform Subtraction
-        ui.label("Step 8: Show Difference (Planewave - Basline Scattering)").style('order: 20;')
-        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 21;')
+        # Step 8: Measure Scattering (plane wave)
+        ui.label("Step 8: Measure Scattering (Plane Wave)").style('order: 18;')
+        ui.image('media/Step3.jpeg').style('order: 19; width: 30%;')
+        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 20;')
+        # scatterer_container_plane has order: 21
 
-        #Step 9 Compre the plane wave illuminaiton and structured illumination scattering 
-        ui.label("Step 9: Compare the scattering under different illuminations").style('order: 23;')
-        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 24;')
+        # Step 9: Perform Subtraction (plane wave)
+        ui.label("Step 9: Show Difference (Plane Wave - Baseline)").style('order: 22;')
+        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 23;')
+        # difference_container_plane has order: 24
+
+        # Step 10: Compare the plane wave illumination and structured illumination scattering 
+        ui.label("Step 10: Compare the scattering under different illuminations").style('order: 25;')
+        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 26;')
+        # comparison_container has order: 27
         
 
 #----END OAM MODE ----

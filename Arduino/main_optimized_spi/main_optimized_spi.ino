@@ -12,22 +12,17 @@
 #include <SPI.h>
 
 // -----------PIN Assignments----------------
-#define SI_PIN   51  // MOSI
-#define CLK_PIN  52  // SCK
-#define LE_PIN   53  // SS
-
+// #define SI_PIN   51  // MOSI
+// #define CLK_PIN  52  // SCK
+#define LE_PIN   10  // LATCH
 #define NUM_ELEMENTS 16
 
-// ------------Variables------------------
-uint8_t phase;
+// -----Variables----
 uint8_t phases[NUM_ELEMENTS];
-bool phaseOPT = 0;
-uint8_t addr;
-uint16_t control_word;
-
 // Direct port pointers for LE (still bit-banging LE for speed)
 volatile uint8_t *le_port;
 uint8_t le_bit;
+
 
 // -------------Setup----------------------
 void setup() {
@@ -50,42 +45,30 @@ void setup() {
 void loop() {
   // Wait until we have NUM_ELEMENTS bytes from Serial
   if (Serial.available() >= NUM_ELEMENTS) {
-    Serial.readBytes(phases,NUM_ELEMENTS);//more bullet proof
-    //debug: repeat back control word
-    //uint16_t control_debug[NUM_ELEMENTS];
-    for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
-      phase = phases[i];
-      // OPT bit mirrors 90 degree bit
-      phaseOPT = (phase >> 6) & 0x1;
-      addr = (i & 0xF);
-      control_word = (addr << 9) | (phaseOPT << 8) | phase;
-      //control_debug[i] = control_word << 3;
-      sendControlWord(control_word);
+    //get phases
+    for (uint8_t i = 0; i < NUM_ELEMENTS; i++){
+      phases[i] = Serial.read();
     }
-    //debug repeat back
-    // Send each 16-bit word as 2 bytes (low byte, high byte)
-    // for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
-    //    Serial.write(control_debug[i] & 0xFF);        // Low byte
-    //    Serial.write((control_debug[i] >> 8) & 0xFF); // High byte
-    //  }
-  }
-}
 
-// --------------Send Control Word via Hardware SPI ----------
-void sendControlWord(uint16_t word) {
-  /*
-   * Sends a 13-bit control word using 16-bit SPI transfer.
-   * Pads the LSBs with zeros.
-   * Pulses LE after transfer to latch.
-   */
-
-  uint16_t tx_word = word << 3; // Align 13-bit word into MSBs of 16-bit transfer
+    //send phases to shifters in control word format
+    //disable interupts for the spi burst
+    noInterrupts();
+    for (uint8_t i = 0; i < NUM_ELEMENTS; i++) {
+      uint8_t phase = phases[i];
+      uint8_t addr = i;
+      //the middle is syhcronize to the ninety degree bit
+      uint16_t control_word = ((addr << 9) | ((phase & 0x40) << 2) | phase) << 3;
+      //note the right shift puts the control word closest to the latch
+      //MSB FIRST IS FASTER so reverse it
+      SPI.transfer16(control_word);
+      //pulse latch
+      //no delay needed the time it takes per clock cycle is enough.
+      *le_port |= le_bit;  // LE high
+      //asm volatile ("nop\n\t"); // tiny delay to meet tLE timing
+      *le_port &= ~le_bit; // LE low
+    }
+    //reenable interupts after spi burst:
+    interrupts();
   
-  // Transfer 16 bits via SPI
-  SPI.transfer16(tx_word);
-  //this is clever we send 16 bits but only the 13 closest to the latch enable are stored into the register.
-  // Pulse LE (latch enable)
-   *le_port |= le_bit;  // LE high
-   asm volatile ("nop\n\t""nop\n\t"); // tiny delay to meet tLE timing
-   *le_port &= ~le_bit; // LE low
+  }
 }
