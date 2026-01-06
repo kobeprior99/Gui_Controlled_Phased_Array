@@ -21,6 +21,13 @@ from pathlib import Path
 s2p_dir = Path(S2PDIR) #directory containing port data
 # Cycle through multiple line styles
 LINE_STYLE = ['-']
+
+# Font sizes
+TITLE_SIZE = 18
+LABEL_SIZE = 16
+TICK_SIZE = 14
+LEGEND_SIZE = 12
+
 def read_s2p(filepath: Path):
     """
     Read S-parameter data from a .s2p file.
@@ -73,12 +80,13 @@ def plot_S41_mag():
         mag_db = 20 * np.log10(np.abs(s41))
         #pick linestyle based on index
         ls = LINE_STYLE[(i-1) % len(LINE_STYLE)]
-        plt.plot(freqs / 1e9, mag_db,linestyle=ls, label=f"Port {i}")
-    plt.xlabel("Frequency (GHz)")
-    plt.ylabel("|S21| (dB)")
-    plt.title("S21 Magnitude (dB) for Each Port")
+        plt.plot(freqs / 1e9, mag_db, linestyle=ls, label=f"Port {i}")
+    plt.xlabel("Frequency (GHz)", fontsize=LABEL_SIZE)
+    plt.ylabel("|S21| (dB)", fontsize=LABEL_SIZE)
+    plt.title("S21 Magnitude (dB) for Each Port", fontsize=TITLE_SIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_SIZE)
     plt.grid(True)
-    plt.legend(ncol=4, fontsize=8)
+    plt.legend(ncol=4, fontsize=LEGEND_SIZE)
     plt.tight_layout()
     plt.show()
 
@@ -98,15 +106,16 @@ def plot_S41_phase(unwrap=True, interactive=False):
         line, = plt.plot(freqs / 1e9, phase_deg, label=f"Port {i}")
         lines.append(line)
         labels.append(f"Port {i}")
-    plt.xlabel("Frequency (GHz)")
-    plt.ylabel("Phase (degrees)")
-    plt.title("S21 Phase for Each Port" + (" (Unwrapped)" if unwrap else ""))
+    plt.xlabel("Frequency (GHz)", fontsize=LABEL_SIZE)
+    plt.ylabel("Phase (degrees)", fontsize=LABEL_SIZE)
+    plt.title("S21 Phase for Each Port" + (" (Unwrapped)" if unwrap else ""), fontsize=TITLE_SIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_SIZE)
     plt.grid(True)
-    leg = plt.legend(ncol=4, fontsize=8,fancybox=True, shadow=False)
+    leg = plt.legend(ncol=4, fontsize=LEGEND_SIZE, fancybox=True, shadow=False)
     plt.tight_layout()
     if interactive:
         # --- Create legend with picking enabled ---
-        leg = plt.legend(ncol=4, fontsize=8, fancybox=True, shadow=False)
+        leg = plt.legend(ncol=4, fontsize=LEGEND_SIZE, fancybox=True, shadow=False)
         for legend_line in leg.get_lines():
             legend_line.set_picker(True)        # make clickable
             legend_line.set_pickradius(5)
@@ -145,11 +154,12 @@ def plot_S11_mag():
         freqs, s11, _, _ = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s11))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
-    plt.xlabel("Frequency (GHz)")
-    plt.ylabel("|S11| (dB)")
-    plt.title("S11 Magnitude (dB) for Each Port")
+    plt.xlabel("Frequency (GHz)", fontsize=LABEL_SIZE)
+    plt.ylabel("|S11| (dB)", fontsize=LABEL_SIZE)
+    plt.title("S11 Magnitude (dB) for Each Port", fontsize=TITLE_SIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_SIZE)
     plt.grid(True)
-    plt.legend(ncol=4, fontsize=8)
+    plt.legend(ncol=4, fontsize=LEGEND_SIZE)
     plt.tight_layout()
     plt.show()
 
@@ -162,11 +172,12 @@ def plot_S44_mag():
         freqs, _, _, s44 = read_s2p(file)
         mag_db = 20 * np.log10(np.abs(s44))
         plt.plot(freqs / 1e9, mag_db, label=f"Port {i}")
-    plt.xlabel("Frequency (GHz)")
-    plt.ylabel("|S22| (dB)")
-    plt.title("S22 Magnitude (dB) for Each Port")
+    plt.xlabel("Frequency (GHz)", fontsize=LABEL_SIZE)
+    plt.ylabel("|S22| (dB)", fontsize=LABEL_SIZE)
+    plt.title("S22 Magnitude (dB) for Each Port", fontsize=TITLE_SIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_SIZE)
     plt.grid(True)
-    plt.legend(ncol=4, fontsize=8)
+    plt.legend(ncol=4, fontsize=LEGEND_SIZE)
     plt.tight_layout()
     plt.show()
 
@@ -216,15 +227,16 @@ def plot_relative_phase(unwrap=True, interactive=False):
     # Add vertical line at reference frequency
     plt.axvline(actual_freq / 1e9, color='k', linestyle='--', alpha=0.3, label=f'Ref Freq ({actual_freq/1e9:.3f} GHz)')
     
-    plt.xlabel("Frequency (GHz)")
-    plt.ylabel("Relative Phase (degrees)")
-    plt.title("Relative S21 Phase (Referenced to Longest Path at FREQ)")
+    plt.xlabel("Frequency (GHz)", fontsize=LABEL_SIZE)
+    plt.ylabel("Relative Phase (degrees)", fontsize=LABEL_SIZE)
+    plt.title("Relative S21 Phase (Referenced to Longest Path at FREQ)", fontsize=TITLE_SIZE)
+    plt.tick_params(axis='both', which='major', labelsize=TICK_SIZE)
     plt.grid(True)
-    leg = plt.legend(ncol=4, fontsize=8, fancybox=True)
+    leg = plt.legend(ncol=4, fontsize=LEGEND_SIZE, fancybox=True)
     plt.tight_layout()
     if interactive:
         # enable clickable legend
-        leg = plt.legend(ncol=4, fontsize=8, fancybox=True)
+        leg = plt.legend(ncol=4, fontsize=LEGEND_SIZE, fancybox=True)
         for lg in leg.get_lines():
             lg.set_picker(True)
             lg.set_pickradius(5)
@@ -253,7 +265,7 @@ def main():
     plot_S11_mag()
     plot_S41_mag()
     plot_S44_mag()
-    plot_S41_phase(unwrap=True, interactive = True)
+    plot_S41_phase(unwrap=True, interactive=True)
     plot_relative_phase()
 
 if __name__ == '__main__':
