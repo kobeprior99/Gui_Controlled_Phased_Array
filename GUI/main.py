@@ -121,6 +121,8 @@ async def set_com_port(port:str):
     #print(f'COM port set to {SELECTED_COM_PORT}')
     try:
         ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
+        ser.dtr = True
+        ser.rts = True
         await asyncio.sleep(3)#allow arduino to reset
     except Exception as e:
         print(f'Failed to open serial port: {e}')

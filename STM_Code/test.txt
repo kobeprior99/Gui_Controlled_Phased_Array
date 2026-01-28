@@ -1,0 +1,34 @@
+uint16_t spi_buf1[6]; // SPI1: 5 elements (last index unused)
+uint16_t spi_buf2[6]; // SPI2: 5 elements (last index unused)
+uint16_t spi_buf3[6]; // SPI3: 6 elements
+
+void prepare_data(uint8_t *raw_phases) {
+    for (int i = 0; i < 16; i++) {
+        uint8_t phase = raw_phases[i];
+        uint16_t word = ((i << 9) | ((phase & 0x40) << 2) | phase) << 3;
+        
+        // Distribute to buffers
+        if (i < 5)       spi_buf1[i] = word;
+        else if (i < 10) spi_buf2[i-5] = word;
+        else             spi_buf3[i-10] = word;
+    }
+}
+
+
+// Inside your main loop or UART Callback
+for (int step = 0; step < 6; step++) {
+    // Start transfers on all 3 SPIs simultaneously
+    if (step < 5) HAL_SPI_Transmit_DMA(&hspi1, (uint8_t*)&spi_buf1[step], 1);
+    if (step < 5) HAL_SPI_Transmit_DMA(&hspi2, (uint8_t*)&spi_buf2[step], 1);
+    HAL_SPI_Transmit_DMA(&hspi3, (uint8_t*)&spi_buf3[step], 1);
+
+    // Wait for the longest one (SPI3 always runs)
+    while (HAL_SPI_GetState(&hspi3) != HAL_SPI_STATE_READY);
+
+    // Pulse Latch
+    HAL_GPIO_WritePin(LE_GPIO_Port, LE_Pin, GPIO_PIN_SET);
+    // The U5 is so fast you might actually need a tiny delay here
+    __NOP(); 
+    HAL_GPIO_WritePin(LE_GPIO_Port, LE_Pin, GPIO_PIN_RESET);
+}
+
