@@ -1,10 +1,10 @@
-13:36:16 **** Incremental Build of configuration Debug for project Phase_Shifter ****
+11:42:36 **** Incremental Build of configuration Debug for project Phase_Shifter ****
 make -j9 all 
 arm-none-eabi-size  Phase_Shifter.elf 
    text	   data	    bss	    dec	    hex	filename
-  40904	      9	   2740	  43653	   aa85	Phase_Shifter.elf
+  40060	      9	   2740	  42809	   a739	Phase_Shifter.elf
 Finished building: default.size.stdout
  
 
-13:36:17 Build Finished. 0 errors, 0 warnings. (took 228ms)
+11:42:36 Build Finished. 0 errors, 0 warnings. (took 171ms)
 

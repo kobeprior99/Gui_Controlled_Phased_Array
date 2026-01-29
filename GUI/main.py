@@ -122,7 +122,7 @@ async def set_com_port(port:str):
     try:
         ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
         ser.dtr = True
-        ser.rts = True
+        ser.rts =True
         await asyncio.sleep(3)#allow arduino to reset
     except Exception as e:
         print(f'Failed to open serial port: {e}')
@@ -142,7 +142,7 @@ def send_phases(phases: np.ndarray):
     hardware_phases = np.uint8(np.round((phases + PHASE_OFFSETS) * (256/360)))
     #send the phases
     ser.write(hardware_phases.tobytes()) 
-    #ser.flush()
+    ser.flush()
     # print(f'hardwarephases: {hardware_phases}')
 
     # #debug: echo
@@ -383,7 +383,7 @@ def manual_page():
         except Exception as e:
             ui.notify(f'Failed to send phases: {e}', color = 'red')
         else:
-            ui.notify('Sucessfully sent phases')
+            ui.notify('Sucessfully sent phases', timeout=1)
 
 #---- END Manual PAGE ----
 

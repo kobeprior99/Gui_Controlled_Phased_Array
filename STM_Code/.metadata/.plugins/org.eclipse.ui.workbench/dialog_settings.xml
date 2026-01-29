@@ -36,4 +36,6 @@
 		<section name="ImportExportWizard.dialogBounds">
 		</section>
 	</section>
+	<section name="EditorSelectionDialog">
+	</section>
 </section>

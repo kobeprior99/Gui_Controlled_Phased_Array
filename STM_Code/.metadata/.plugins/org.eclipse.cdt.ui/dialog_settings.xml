@@ -17,4 +17,8 @@
 		<item key="width" value="394"/>
 		<item key="height" value="585"/>
 	</section>
+	<section name="completion_proposal_size">
+	</section>
+	<section name="org.eclipse.cdt.ui.text.hover.CMacroExpansionExploration">
+	</section>
 </section>
