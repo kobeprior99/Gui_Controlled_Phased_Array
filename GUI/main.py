@@ -113,7 +113,7 @@ def gen_Cal_from_S2P() -> None:
 
 
 
-SELECTED_COM_PORT = 'SELECT ARDUINO PORT' #global variable to store com selection
+SELECTED_COM_PORT = 'SELECT MCU PORT' #global variable to store com selection
 async def set_com_port(port:str):
     global SELECTED_COM_PORT,ser
     SELECTED_COM_PORT = port
@@ -315,8 +315,8 @@ def main_page():
     
     def navigate_if_ready(target):
         """Navigate only if a valid com is selected"""
-        if SELECTED_COM_PORT == 'SELECT ARDUINO PORT':
-            ui.notify("Please Select Arduino Port before proceeding.",color = 'red')
+        if SELECTED_COM_PORT == 'SELECT MCU PORT':
+            ui.notify("Please Select MCU Port before proceeding.",color = 'red')
             return
         ui.navigate.to(target)
 

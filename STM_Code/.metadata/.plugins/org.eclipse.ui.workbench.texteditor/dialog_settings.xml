@@ -3,15 +3,20 @@
 	<item key="hasShownOverlayPopupBefore" value="true"/>
 	<item key="replaceBarOpen" value="false"/>
 	<list key="searchhistory">
-		<item value="while "/>
+		<item value="GPIO_Init"/>
+		<item value="while (1)"/>
+		<item value="MX_GPIO_INIT"/>
+		<item value="runparallelspi"/>
+		<item value="RunParal"/>
+		<item value="RunParallelSpiBurst"/>
+		<item value="RunPar"/>
+		<item value="HAL_GPIO"/>
+		<item value="HAL_GPIO_T"/>
+		<item value="RunPa"/>
 		<item value="GPIO"/>
+		<item value="while"/>
+		<item value="while "/>
 		<item value="HAL_SPI_Transmit_DMA"/>
 		<item value="hspi2"/>
-		<item value="spi_buf1"/>
-		<item value="GPIO_INI"/>
-		<item value="NVIC"/>
-		<item value="config"/>
-		<item value="HAL_PWREx_ConfigSupply(PWR_SMPS_SUPPLY)"/>
-		<item value="gpio"/>
 	</list>
 </section>
