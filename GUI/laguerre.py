@@ -238,6 +238,6 @@ if __name__ == "__main__":
             l=1,
             p=0,
             w0_values=np.linspace(0.05, 0.5, 30),
-            z0=0,
+            z0=-.01,
             interval=400
         )
