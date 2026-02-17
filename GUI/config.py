@@ -8,7 +8,7 @@ NUM_ELEMENTS = 16
 NSIDE = 4
 
 #RX grid 
-#default element spacing in terms of lambda 
+#spacing in meters
 dx_m = 48.3e-3
 dy_m = 56.4e-3
 
