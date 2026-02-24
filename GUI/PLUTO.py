@@ -35,7 +35,6 @@ def tx():
     global TX_ACTIVE
     sdr.tx(TONE)
     TX_ACTIVE=True
-
 def stop_tx():
     '''stop transmitting by deleting the buffer'''
     #check if tx is active though 
@@ -43,6 +42,10 @@ def stop_tx():
     if TX_ACTIVE == True:
         sdr.tx_destroy_buffer()
         TX_ACTIVE=False
+
+def discard_buffer():
+        sdr.rx()
+        sdr.rx()
 
 def get_energy() -> float:
     """
@@ -56,6 +59,7 @@ def get_energy() -> float:
         power+= np.mean(np.abs(rx)**2)
     power /= NUM_AVG
     return power
+
 def moving_average(x, window=8):
     x = np.asarray(x)
     return np.convolve(x, np.ones(window)/window, mode='valid')

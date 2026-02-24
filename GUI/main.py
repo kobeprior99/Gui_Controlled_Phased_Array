@@ -549,7 +549,7 @@ def oam_page():
         stop_button.visible = False            
 
 
-        def record_burst(trial_name, duration=1.0, sample_interval=0.01):
+        def record_burst(trial_name, duration=.4, sample_interval=0.002):
             '''
             transmit a burst of continuous wave and record recieved "power"
             '''
@@ -557,14 +557,19 @@ def oam_page():
             #start trasmission
             tx()
             time.sleep(SETTLE_TIME)
-
+            discard_buffer() #discard stale rx buffer
             energy_values = []
 
             num_samples = int(duration/sample_interval)
-            for _ in range(num_samples):
+            start_time = time.time()
+            for i in range(num_samples):
                 energy = get_energy()
                 energy_values.append(energy)
-                time.sleep(sample_interval)
+                elapsed = time.time() - start_time
+                next_tick = (i+1) * sample_interval
+                sleep_time = next_tick - elapsed
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
             #end transmission
             stop_tx()
             #store the data
