@@ -226,7 +226,7 @@ if __name__ == "__main__":
 
     if run_z0:
         animate_sweep_z0(
-            l=1,
+            l=0,
             p=0,
             z0_values=np.linspace(-1.5, 1.5, 60),
             w0=0.2,
@@ -235,7 +235,7 @@ if __name__ == "__main__":
 
     if run_w0:
         animate_sweep_w0(
-            l=1,
+            l=0,
             p=0,
             w0_values=np.linspace(0.05, 0.5, 30),
             z0=-.01,
