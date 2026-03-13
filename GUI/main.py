@@ -5,7 +5,7 @@
  Description:  Main control interface for a low-cost 16-element phase shifter.
                
                This program provides a graphical user interface (GUI) built 
-               with NiceGUI for calibrating and controlling an Arduino-driven
+               with NiceGUI for calibrating and controlling an MCU-driven
                phase shifting network.
 
                Users can:
@@ -13,10 +13,10 @@
                  - Load and save calibration data
                  - Generate predefined phase profiles for OAM and Hermite modes
                  - Perform beam steering and visualization
-                    -Receive Mode (DOA Approximation)
+                    -Receive Mode (AOA Approximation)
                     -Transmit Mode (Psuedo Gain Pattern analysis)
                
-               The system communicates with the Arduino over a serial interface,
+               The system communicates with the MCU over a serial interface,
                sending phase commands as packed bytes. 
 
                Designed for educational and research applications in phased array
@@ -39,7 +39,7 @@ import plotly.graph_objects as go
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
-PHASE_OFFSETS =np.zeros(16,dtype=int)
+PHASE_OFFSETS =np.zeros(16,dtype=float)
 #flag to tell the user to calibrate if they haven't already
 PHASE_CORRECTED = False 
 #store reference to phase_input number boxes
@@ -49,13 +49,15 @@ selected = None
 #for scattering experiment global dictionary
 burst_data_oam = {}
 burst_data_hermite ={}
+PHASE_STEP = 360/256
+
 #----HELPER FUNCTIONS----
 def update_phase(index:int, value:int):
     global PHASE_CORRECTED, PHASE_OFFSETS
     if value is None or value == '':
         return #ignore empty or None inputs
     try:
-        PHASE_OFFSETS[index] = int(value) 
+        PHASE_OFFSETS[index] = float(value) 
         PHASE_CORRECTED = True #set flag to true 
 
     except ValueError:
@@ -65,14 +67,15 @@ def update_phase_inputs():
     '''Referesh displayed UI numbers when phase_offsets changes.'''
     #only update changed fields 
     for i, (field, val) in enumerate(zip(phase_inputs, PHASE_OFFSETS)):
-        if field.value !=val:
+        if not np.isclose(field.value, val):
             field.value = val
 def save_calibration(filename:str):
     '''
     Save the calibration as a json file to be used on later runs
     '''
+    rounded_offsets = (np.round(PHASE_OFFSETS / PHASE_STEP)* PHASE_STEP).tolist()
     with open(f'{filename}.json', 'w') as f:
-        json.dump(PHASE_OFFSETS.tolist(), f)
+        json.dump(rounded_offsets, f)
     ui.notify(f'Calibration saved successfully into {filename}.json!')
 
 def use_calibration_file(filename:str):
@@ -83,7 +86,7 @@ def use_calibration_file(filename:str):
     try:
         with open(f'{filename}.json', 'r') as f:
             loaded_offsets = json.load(f)
-        PHASE_OFFSETS = np.array(loaded_offsets,dtype = int)
+        PHASE_OFFSETS = np.round(np.array(loaded_offsets) / PHASE_STEP) * PHASE_STEP
         PHASE_CORRECTED = True
         update_phase_inputs() #refresh ui
         ui.notify(f'Calibration file: {filename}.json loaded and applied!')
@@ -138,7 +141,6 @@ def send_phases(phases: np.ndarray):
     #vectorized conversion to 8-bit 
     #scales degrees 0-360 to phase_words 0-255
     #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
-    #adding 0.5 ensures when type conversion happens we round to the nearest integer instead of truncating
     hardware_phases = np.uint8(np.round((phases + PHASE_OFFSETS) * (256/360)))
     #send the phases
     ser.write(hardware_phases.tobytes()) 
@@ -1533,8 +1535,8 @@ def calibrate():
             ui.label('The phase of each shifter is set to 0°.').classes('text-base text-gray-600 text-center')
             ui.label('Please Load Defualt Calibration File by clicking load calibration and typing Default').classes('text-base text-gray-600 text-center')
             ui.label('If recalibration is needed please manually enter phases and save or redo s2p measurements for each port and create the new calibration').classes('text-base text-gray-600 text-center')
-            ui.label('Enter the phase (in degrees) from the S21 measurement for each port.').classes('text-base text-gray-600 text-center')
             
+            ui.label('Note that when you load the calibration it will be rounded to the accuracy of the phase shifter 1.40625 degrees/LSB').classes('text-base text-gray-600 text-center')
     def prompt_save_calibration():
         with ui.dialog() as dialog, ui.card():
             ui.label('Enter filename to save calibration (".json" will be added automatically):')
