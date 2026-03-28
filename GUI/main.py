@@ -1444,8 +1444,6 @@ def beam_page():
 
                 for i, phases in enumerate(DEFAULT_RX_GRID):
                     send_phases(phases)
-                    #takes about 147us to latch all and settle give it 200us to be safe
-                    await asyncio.sleep(200e-6)  # allow phase to stabilize / UI refresh
                     energies[i] = get_energy() #time to sample ~410us
                     label.set_text(f"Scanning {i+1}/{n_steps}")
 
