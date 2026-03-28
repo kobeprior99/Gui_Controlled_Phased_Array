@@ -7,8 +7,7 @@ try:
     sdr = adi.Pluto("ip:192.168.2.1")
     sdr.sample_rate = int(SAMP_RATE)
 
-# --- tx setup ---
-    sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
+# --- tx setup --- sdr.tx_rf_bandwidth = int(SAMP_RATE)     # match baseband bw
     sdr.tx_lo = int(FREQ)                    # rf carrier in hz
     sdr.tx_hardwaregain_chan0 = TX_GAIN          #dBm 
     sdr.tx_cyclic_buffer = True

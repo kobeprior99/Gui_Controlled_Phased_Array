@@ -123,7 +123,7 @@ async def set_com_port(port:str):
     #debug
     #print(f'COM port set to {SELECTED_COM_PORT}')
     try:
-        ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE)
+        ser = serial.Serial(SELECTED_COM_PORT,BAUDRATE, bytesize=serial.EIGHTBITS,parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, timeout=1)
         ser.dtr = True
         ser.rts =True
         await asyncio.sleep(3)#allow arduino to reset
@@ -145,7 +145,7 @@ def send_phases(phases: np.ndarray):
     #send the phases
     ser.write(hardware_phases.tobytes()) 
     ser.flush()
-    # print(f'hardwarephases: {hardware_phases}')
+    #print(f'hardwarephases: {hardware_phases}')
 
     # #debug: echo
     # echo = ser.read(32)  # 16 words × 2 bytes each
