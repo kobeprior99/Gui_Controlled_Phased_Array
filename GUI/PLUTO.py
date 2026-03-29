@@ -58,7 +58,11 @@ def get_energy() -> float:
         power+= np.mean(np.abs(rx)**2)
     power /= NUM_AVG
     return power
-
+def get_energy_fast() -> float:
+    "for receive mode get the energy without averaging" 
+    rx = sdr.rx()
+    power = np.mean(np.abs(rx)**2)
+    return power
 def moving_average(x, window=8):
     x = np.asarray(x)
     return np.convolve(x, np.ones(window)/window, mode='valid')
