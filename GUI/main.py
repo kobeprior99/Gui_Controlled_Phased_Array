@@ -1428,39 +1428,41 @@ def beam_page():
 
         def Scan_Beam():
             """Launches beam scan in background with progress bar"""
-
             with ui.dialog() as dialog, ui.card():
-                label = ui.label('Scanning...')
-                progress_bar = ui.linear_progress().props('indeterminate')
+                label = ui.label('Starting beam scan...')
+                progress_bar = ui.linear_progress(show_value = False)\
+                    .props('indeterminate')
                 dialog.open()
 
-            async def scan_task():
-                tx()
 
+            async def scan_task():
+                # Launch the scan as an async background task
+                tx()
+                # clear receive buffer 
+                for _ in range(3): 
+                    discard_buffer()   
                 n_steps = len(DEFAULT_RX_GRID)
                 energies = np.zeros(n_steps)
-                for _ in range(14):
-                    discard_buffer()
+
                 for i, phases in enumerate(DEFAULT_RX_GRID):
                     send_phases(phases)
-                    energies[i] = get_energy_fast() 
-
-                    # Update UI less often
-                    if i % 64 == 0:
-                        label.set_text(f"Scanning {i+1}/{n_steps}")
-                        await asyncio.sleep(0)  # yield to UI
+                    #takes about 147us to latch all and settle give it 200us to be safe
+                    await asyncio.sleep(200e-6)  # allow phase to stabilize / UI refresh
+                    energies[i] = get_energy() #time to sample ~410us
+                    label.set_text(f"Scanning {i+1}/{n_steps}")
 
                 stop_tx()
 
-                # --- Process results ---
+                # Reshape and plot
                 energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
-                energies_2D /= np.max(energies_2D)
-
+                energies_2D /= np.max(energies_2D) #normalize
+                # Find peak location
                 peak_idx = np.unravel_index(np.argmax(energies_2D), energies_2D.shape)
                 theta_peak = THETA_RANGE[peak_idx[0]]
                 phi_peak = PHI_RANGE[peak_idx[1]]
 
-                # --- Plot ---
+                r=3#circle radius
+
                 fig, ax = plt.subplots(figsize=(8, 6))
 
                 im = ax.imshow(
@@ -1471,113 +1473,39 @@ def beam_page():
                     cmap='plasma'
                 )
 
-                ax.plot(phi_peak, theta_peak, 'ro', markersize=10)
-
+                #mark the point                
+                ax.plot(phi_peak, theta_peak, 'ro', markersize=10)  # Mark peak
+                # Annotate with coordinates
                 ax.annotate(
-                    f"φ: {phi_peak:.1f}°, θ: {theta_peak:.1f}°",
-                    xy=(phi_peak, theta_peak),
-                    xytext=(0, 10),
-                    textcoords='offset points',
+                    fr"$\phi$: {phi_peak:.1f}°,$\theta$: {theta_peak:.1f}°",
+                    xy=(phi_peak, theta_peak),                 # point to annotate
+                    xytext=(0, 10),                           # offset in pixels
                     ha='center',
+                    va='center',
+                    textcoords='offset points',
                     color='white',
+                    fontsize=10,
                     bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
+                    zorder=100
                 )
-
                 plt.colorbar(im, ax=ax, label='Received energy')
+
                 ax.set_xlabel('Phi [deg]')
                 ax.set_ylabel('Theta [deg]')
                 ax.set_title('Beam Scan')
-
                 plt.savefig('media/rx_heat.png', dpi=300)
                 plt.close()
-
-                # --- Update UI with result ---
+                # Update UI with plot
                 image_container.clear()
                 with image_container:
-                    ui.image('media/rx_heat.png').style('width:65%').force_reload()
+                    ui.image('media/rx_heat.png').style('width:65%;').force_reload()
 
+                # Hide progress bar after completion
                 dialog.close()
 
-            asyncio.create_task(scan_task())
-
+            asyncio.create_task(scan_task()) 
         ui.button('Start', on_click=Scan_Beam)
-        # def Scan_Beam():
-        #     """Launches beam scan in background with progress bar"""
-        #     with ui.dialog() as dialog, ui.card():
-        #         label = ui.label('Starting beam scan...')
-        #         progress_bar = ui.linear_progress(show_value = False)\
-        #             .props('indeterminate')
-        #         dialog.open()
-        #
-        #
-        #     async def scan_task():
-        #         # Launch the scan as an async background task
-        #         tx()
-        #         n_steps = len(DEFAULT_RX_GRID)
-        #         energies = np.zeros(n_steps)
-        #
-        #         for i, phases in enumerate(DEFAULT_RX_GRID):
-        #             send_phases(phases)
-        #             #takes about 147us to latch all and settle give it 200us to be safe
-        #             await asyncio.sleep(50e-6)  # allow phase to stabilize / UI refresh
-        #             energies[i] = get_energy() #time to sample ~410us
-        #             label.set_text(f"Scanning {i+1}/{n_steps}")
-        #
-        #         stop_tx()
-        #
-        #         # Reshape and plot
-        #         energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
-        #         energies_2D /= np.max(energies_2D) #normalize
-        #         # Find peak location
-        #         peak_idx = np.unravel_index(np.argmax(energies_2D), energies_2D.shape)
-        #         theta_peak = THETA_RANGE[peak_idx[0]]
-        #         phi_peak = PHI_RANGE[peak_idx[1]]
-        #
-        #         r=3#circle radius
-        #
-        #         fig, ax = plt.subplots(figsize=(8, 6))
-        #
-        #         im = ax.imshow(
-        #             energies_2D,
-        #             extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],
-        #             origin='lower',
-        #             aspect='auto',
-        #             cmap='plasma'
-        #         )
-        #
-        #         #mark the point                
-        #         ax.plot(phi_peak, theta_peak, 'ro', markersize=10)  # Mark peak
-        #         # Annotate with coordinates
-        #         ax.annotate(
-        #             fr"$\phi$: {phi_peak:.1f}°,$\theta$: {theta_peak:.1f}°",
-        #             xy=(phi_peak, theta_peak),                 # point to annotate
-        #             xytext=(0, 10),                           # offset in pixels
-        #             ha='center',
-        #             va='center',
-        #             textcoords='offset points',
-        #             color='white',
-        #             fontsize=10,
-        #             bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
-        #             zorder=100
-        #         )
-        #         plt.colorbar(im, ax=ax, label='Received energy')
-        #
-        #         ax.set_xlabel('Phi [deg]')
-        #         ax.set_ylabel('Theta [deg]')
-        #         ax.set_title('Beam Scan')
-        #         plt.savefig('media/rx_heat.png', dpi=300)
-        #         plt.close()
-        #         # Update UI with plot
-        #         image_container.clear()
-        #         with image_container:
-        #             ui.image('media/rx_heat.png').style('width:65%;').force_reload()
-        #
-        #         # Hide progress bar after completion
-        #         dialog.close()
-        #
-        #     asyncio.create_task(scan_task()) 
-        # ui.button('Start', on_click=Scan_Beam)
-        #
+
 
     #----Receive Mode page----
 

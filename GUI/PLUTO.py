@@ -44,7 +44,6 @@ def stop_tx():
 
 def discard_buffer():
         sdr.rx()
-        sdr.rx()
 
 def get_energy() -> float:
     """
@@ -58,6 +57,7 @@ def get_energy() -> float:
         power+= np.mean(np.abs(rx)**2)
     power /= NUM_AVG
     return power
+
 def get_energy_fast() -> float:
     "for receive mode get the energy without averaging" 
     rx = sdr.rx()
