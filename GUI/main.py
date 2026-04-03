@@ -1438,16 +1438,20 @@ def beam_page():
             async def scan_task():
                 # Launch the scan as an async background task
                 tx()
+                # warm up transmit 
+                asyncio.sleep(0.01)
                 # clear receive buffer 
-                for _ in range(3): 
+                for _ in range(10): 
                     discard_buffer()   
+
                 n_steps = len(DEFAULT_RX_GRID)
                 energies = np.zeros(n_steps)
 
                 for i, phases in enumerate(DEFAULT_RX_GRID):
                     send_phases(phases)
                     #takes about 147us to latch all and settle give it 200us to be safe
-                    await asyncio.sleep(200e-6)  # allow phase to stabilize / UI refresh
+                    await asyncio.sleep(100e-6)  # allow phase to stabilize / UI refresh
+                    discard_buffer()#just in case throw out sample
                     energies[i] = get_energy() #time to sample ~410us
                     label.set_text(f"Scanning {i+1}/{n_steps}")
 
