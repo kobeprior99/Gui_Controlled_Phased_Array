@@ -144,7 +144,7 @@ def send_phases(phases: np.ndarray):
     hardware_phases = np.uint8(np.round((phases + PHASE_OFFSETS) * (256/360)))
     #send the phases
     ser.write(hardware_phases.tobytes()) 
-    ser.flush()
+    # ser.flush()
     #print(f'hardwarephases: {hardware_phases}')
 
     # #debug: echo

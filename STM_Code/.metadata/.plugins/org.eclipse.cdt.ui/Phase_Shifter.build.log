@@ -1,4 +1,4 @@
-16:48:17 **** Incremental Build of configuration Debug for project Phase_Shifter ****
+00:23:00 **** Incremental Build of configuration Debug for project Phase_Shifter ****
 make -j9 all 
 arm-none-eabi-gcc "../Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal.c" -mcpu=cortex-m33 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32U575xx -c -I../Core/Inc -I../Drivers/STM32U5xx_HAL_Driver/Inc -I../Drivers/STM32U5xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32U5xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal.d" -MT"Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal.o" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -o "Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal.o"
 arm-none-eabi-gcc "../Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_cortex.c" -mcpu=cortex-m33 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32U575xx -c -I../Core/Inc -I../Drivers/STM32U5xx_HAL_Driver/Inc -I../Drivers/STM32U5xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32U5xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_cortex.d" -MT"Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_cortex.o" --specs=nano.specs -mfpu=fpv5-sp-d16 -mfloat-abi=hard -mthumb -o "Drivers/STM32U5xx_HAL_Driver/Src/stm32u5xx_hal_cortex.o"
@@ -30,11 +30,11 @@ Finished building target: Phase_Shifter.elf
 arm-none-eabi-size  Phase_Shifter.elf 
 arm-none-eabi-objdump -h -S Phase_Shifter.elf  > "Phase_Shifter.list"
    text	   data	    bss	    dec	    hex	filename
-  29884	      9	   1908	  31801	   7c39	Phase_Shifter.elf
+  29896	      9	   1908	  31813	   7c45	Phase_Shifter.elf
 Finished building: default.size.stdout
  
 Finished building: Phase_Shifter.list
  
 
-16:48:19 Build Finished. 0 errors, 0 warnings. (took 1s.641ms)
+00:23:02 Build Finished. 0 errors, 0 warnings. (took 2s.114ms)
 
