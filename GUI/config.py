@@ -36,4 +36,4 @@ NUM_AVG = 4
 SETTLE_TIME = 1 #time to transmit before capturing burst
 
 #calibration directory
-S2PDIR = 'S2P_MARCH_28'
+S2PDIR = 'S2P_4-9'
