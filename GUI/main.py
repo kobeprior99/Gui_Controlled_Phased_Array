@@ -1438,21 +1438,17 @@ def beam_page():
             async def scan_task():
                 # Launch the scan as an async background task
                 tx()
-                # warm up transmit 
-                asyncio.sleep(0.01)
                 # clear receive buffer 
-                for _ in range(10): 
-                    discard_buffer()   
-
                 n_steps = len(DEFAULT_RX_GRID)
                 energies = np.zeros(n_steps)
 
                 for i, phases in enumerate(DEFAULT_RX_GRID):
                     send_phases(phases)
-                    #takes about 147us to latch all and settle give it 200us to be safe
-                    await asyncio.sleep(100e-6)  # allow phase to stabilize / UI refresh
-                    discard_buffer()#just in case throw out sample
+                    if i == 0:
+                        for _ in range(10):
+                            discard_buffer()
                     energies[i] = get_energy() #time to sample ~410us
+                    await asyncio.sleep(10e-6)
                     label.set_text(f"Scanning {i+1}/{n_steps}")
 
                 stop_tx()
@@ -1464,8 +1460,6 @@ def beam_page():
                 peak_idx = np.unravel_index(np.argmax(energies_2D), energies_2D.shape)
                 theta_peak = THETA_RANGE[peak_idx[0]]
                 phi_peak = PHI_RANGE[peak_idx[1]]
-
-                r=3#circle radius
 
                 fig, ax = plt.subplots(figsize=(8, 6))
 
@@ -1508,6 +1502,7 @@ def beam_page():
                 dialog.close()
 
             asyncio.create_task(scan_task()) 
+
         ui.button('Start', on_click=Scan_Beam)
 
 
