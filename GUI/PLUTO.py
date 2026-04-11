@@ -65,6 +65,7 @@ def get_energy_fast() -> float:
     rx = sdr.rx()
     power = np.mean(np.abs(rx)**2)
     return power
+
 def moving_average(x, window=8):
     x = np.asarray(x)
     return np.convolve(x, np.ones(window)/window, mode='valid')

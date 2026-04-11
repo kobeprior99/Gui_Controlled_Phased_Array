@@ -26,7 +26,7 @@
 """
 #import all necessary libraries
 import time, serial, struct, serial.tools.list_ports, json, os
-from nicegui import ui
+from nicegui import ui,app
 import numpy as np 
 from config import OAM_PHASES,BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
 import matplotlib
@@ -39,6 +39,7 @@ from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
 from PLUTO import get_energy, get_energy_fast,discard_buffer, tx, stop_tx, moving_average
 import plotly.graph_objects as go
+MEDIA_DIR = os.path.join(os.path.dirname(__file__), 'media')
 #global serial handler
 ser = None
 #Phase offsets stored globally to be used across the program
@@ -622,18 +623,16 @@ def oam_page():
             fig.savefig(path, dpi=120)
             plt.close(fig)
 
-            plot_widget.set_source(path + f'?v={int(time.time())}')   # force-reload trick
+            plot_widget.set_source(path )  # force-reload trick
+            plot_widget.force_reload()
             plot_widget.style('width:80%; display:block')
             ui.notify(f'{channel_label} recording complete!', type='positive')
 
         ui.label('Press to record co-polarized (receive array aligned with transmit):') \
             .classes('text-lg')
-        ui.button(
-            'Record Co-pol Time Series',
-            on_click=lambda: asyncio.create_task(
-                gen_time_series_received_power('Co-polarized', ts_plot_co, 'copol')
-            )
-        )
+        async def record_copol():
+            await gen_time_series_received_power('Co-polarized', ts_plot_co,'copol')
+        ui.button('Record Co-pol Time Series', on_click=record_copol)
         ts_plot_co  # display here in layout
 
         ui.label('Step 4: Rotate Receive Array and Record Cross-polarized Power') \
@@ -643,12 +642,9 @@ def oam_page():
 
         ui.label('Press to record cross-polarized (receive array rotated 90°):') \
             .classes('text-lg')
-        ui.button(
-            'Record Cross-pol Time Series',
-            on_click=lambda: asyncio.create_task(
-                gen_time_series_received_power('Cross-polarized', ts_plot_cross, 'xpol')
-            )
-        )
+        async def record_xpol():
+            await gen_time_series_received_power('Cross-polarized', ts_plot_cross,'xpol')
+        ui.button('Record Cross-pol Time Series', on_click=record_xpol)
         ts_plot_cross  # display here in layout
 
 # ─── Step 5: Polarization animation ──────────────────────────────────────────
@@ -693,21 +689,21 @@ def oam_page():
             ax.set_aspect('equal')
             ax.set_xlim(-1.25, 1.25)
             ax.set_ylim(-1.25, 1.25)
-            ax.set_facecolor('#1a1a1a')
-            fig.patch.set_facecolor('#1a1a1a')
+            ax.set_facecolor('#e3e3e1')
+            fig.patch.set_facecolor(#e3e3e3')
 
             # Unit circle
             theta = np.linspace(0, 2 * np.pi, 300)
             ax.plot(np.cos(theta), np.sin(theta), color='#444', linewidth=0.8)
 
             # Axis lines
-            ax.axhline(0, color='#333', linewidth=0.5)
-            ax.axvline(0, color='#333', linewidth=0.5)
+            ax.axhline(0, color='#000000', linewidth=0.5)
+            ax.axvline(0, color='#000000', linewidth=0.5)
 
             # Axis labels
-            ax.text( 1.18, 0.04, 'cross-pole', color='#888', fontsize=7, ha='right')
-            ax.text( 0.04, 1.18, 'co-pole',    color='#888', fontsize=7, ha='left')
-            ax.text( 0, -1.22, 'Polarization State', color='#aaa',
+            ax.text( 1.18, 0.04, 'cross-pole', color='#000000', fontsize=7, ha='right')
+            ax.text( 0.04, 1.18, 'co-pole',    color='#000000', fontsize=7, ha='left')
+            ax.text( 0, -1.22, 'Return Polarization', color='#aaa',
                      fontsize=9, ha='center', va='top', fontweight='bold')
 
             # Animated artists
@@ -724,7 +720,7 @@ def oam_page():
                 color='#D85A30', linewidth=2
             )
             ax.add_patch(arc_patch)
-            time_txt = ax.text(-1.2, 1.15, '', color='#aaa', fontsize=8)
+            time_txt = ax.text(-1.2, 1.15, '', color='#000000', fontsize=8)
 
             def init():
                 vec_x.set_data([], [])
@@ -773,10 +769,10 @@ def oam_page():
             ani.save(path, writer=writer)
             plt.close(fig)
 
-            anim_image.set_source(path + f'?v={int(time.time())}')
+            anim_image.set_source(path)
+            anim_image.force_reload()
             anim_image.style('width:60%; display:block')
             ui.notify('Animation ready!', type='positive')
-
         ui.button('Generate Polarization Animation', on_click=gen_polarization_animation)
         anim_image
 #----END OAM MODE ----
