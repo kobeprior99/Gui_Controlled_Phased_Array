@@ -690,7 +690,7 @@ def oam_page():
             ax.set_xlim(-1.25, 1.25)
             ax.set_ylim(-1.25, 1.25)
             ax.set_facecolor('#e3e3e1')
-            fig.patch.set_facecolor(#e3e3e3')
+            fig.patch.set_facecolor('#e3e3e3')
 
             # Unit circle
             theta = np.linspace(0, 2 * np.pi, 300)
@@ -703,7 +703,7 @@ def oam_page():
             # Axis labels
             ax.text( 1.18, 0.04, 'cross-pole', color='#000000', fontsize=7, ha='right')
             ax.text( 0.04, 1.18, 'co-pole',    color='#000000', fontsize=7, ha='left')
-            ax.text( 0, -1.22, 'Return Polarization', color='#aaa',
+            ax.text( 0, -1.22, 'Return Polarization', color='#000000',
                      fontsize=9, ha='center', va='top', fontweight='bold')
 
             # Animated artists
