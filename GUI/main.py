@@ -25,11 +25,14 @@
 ===============================================================================
 """
 #import all necessary libraries
-import time, serial, struct, serial.tools.list_ports,json,os
+import time, serial, struct, serial.tools.list_ports, json, os
 from nicegui import ui
 import numpy as np 
-from config import BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
+from config import OAM_PHASES,BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
@@ -130,7 +133,6 @@ async def set_com_port(port:str):
     except Exception as e:
         print(f'Failed to open serial port: {e}')
 
-# <TODO>: MAKE THIS THREADED SO ITS FASTER
 def send_phases(phases: np.ndarray):
     """
     Connects to Arduino over serial and sends a list of 16 phase values.
@@ -141,12 +143,14 @@ def send_phases(phases: np.ndarray):
     #vectorized conversion to 8-bit 
     #scales degrees 0-360 to phase_words 0-255
     #snaps to nearest integer and modulo is implicit in type delcaration (handles negatives, and wrapping)
-    hardware_phases = np.uint8(np.round((phases + PHASE_OFFSETS) * (256/360)))
+    total_phase = (phases + PHASE_OFFSETS)
+    normalized_phase = total_phase % 360
+    
+    hardware_phases = np.uint8(np.round(normalized_phase* (256 / 360)))
     #send the phases
     ser.write(hardware_phases.tobytes()) 
     # ser.flush()
     #print(f'hardwarephases: {hardware_phases}')
-
     # #debug: echo
     # echo = ser.read(32)  # 16 words × 2 bytes each
     # control_words = np.frombuffer(echo, dtype=np.uint16)
@@ -206,32 +210,7 @@ def oam_mode(mode: str):
     Args: 
         mode(str): e.g. '-1' or '2'
     '''
-    #default oam_1
-    phases = np.array([
-        140.2, 111.8, 68.2, 39.8, 164.5, 140.2, 39.8, 15.5, 195.5, 219.8, 320.2, 344.5, 219.8, 248.2, 291.8,320.2 
-    ]) 
-    if mode == '-3':
-        phases *= -3
-
-    if mode == '-2':
-        #Mode =-2 
-        phases *= -2
-
-    elif mode == '-1':
-        #Mode = -1
-        phases *= -1
-
-    elif mode == '1':
-        #OAM mode 1
-        pass 
-    elif mode =='2':
-        # Mode 2 
-        phases *= 2
-
-    else:
-        #Mode = 3
-        phases *= 3
-
+    phases = OAM_PHASES * int(mode)
     #send the appropriate phase
     try: 
         send_phases(phases)
@@ -406,7 +385,6 @@ def oam_page():
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
 
-    #TODO create two Buttons
     with ui.row().classes('w-full justify-center items-center'):
         ui.button('Measure Only', on_click=lambda: ui.navigate.to('/measure')).\
         classes('w-64 h-24 text-xl')
@@ -419,7 +397,8 @@ def oam_page():
     ('-1', 'oam-1.png'),
     ('1', 'oam1.png'),
     ('2', 'oam2.png'),
-    ('3', 'oam3.png')
+    ('3', 'oam3.png'),
+    ('0', 'plane_wave.png')
     ]
 
     image_elements = {} # store references to each image ui element
@@ -461,19 +440,22 @@ def oam_page():
             .classes('text-2xl font-bold text-center')
         ui.image('media/scat_instruct.png').style('width:30%')
         #Step 1: Choose Mode 
-        ui.label("Step 1: Choose The Mode")
+        ui.label("Step 1: Choose The Mode")\
+            .classes('text-2xl font-bold text-center')
+
         with ui.row().classes('w-full justify-center items-center gap-4'):
             for target, filename in images:
                 img = ui.image(f'media/{filename}')\
                     .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
                     .on('click', lambda _, t=target: select_image(t))
                 image_elements[target] = img #store reference
-        #Step 2: Find Beam Direction
-        ui.label('Step2: Confirm Main Beam Direction')
-        ui.image('media/Step1.jpeg').style('width:30%')  
 
-        #live tx plot 
-        
+        ui.label('Step 2: Probe for Main Beam Direction') \
+            .classes('text-2xl font-bold text-center')
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            ui.image('media/probe_beam_dir.png').style('width:50%')
+        ui.label('Rotate the transmit antenna until maximum average received power is achieved') 
+
         with ui.row().classes('w-full justify-center items-center'):
             y_min = ui.number(
                 label ='Set Minimum Power for Graph',
@@ -485,7 +467,7 @@ def oam_page():
                 value=10,
                 min=1
             ).style('width:30%')
-
+        #live tx plot 
         fig = go.Figure(
             go.Scatter(x=[], y=[],mode = 'lines', name='Received Energy')
         )
@@ -501,13 +483,11 @@ def oam_page():
         .style('order:2; width:90%;')
         stop_event = asyncio.Event()
         
-        
         def start_live_plot():
             # Start continuous TX
             tx()
             # Reset stop_event
             stop_event.clear()
-
             # Launch async update
             asyncio.create_task(live_update())
             stop_button.visible = True
@@ -535,7 +515,6 @@ def oam_page():
 
                 await asyncio.sleep(0.05)  # ~20 Hz refresh
                 
-
         def stop_live():
             #stop transmitting 
             stop_tx()
@@ -549,298 +528,257 @@ def oam_page():
             on_click=stop_live
         )
         stop_button.visible = False            
+     
+        
+# ─── Step 3 / 4: Time-series measurement ─────────────────────────────────────
 
+        ui.label('Step 3: Record Backscattered Power Time Series') \
+            .classes('text-2xl font-bold text-center')
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            ui.image('media/scatterer_location.png').style('width:40%')
+            ui.image('media/monostatic.png').style('width:40%')
 
-        def record_burst(trial_name, duration=.4, sample_interval=0.002):
-            '''
-            transmit a burst of continuous wave and record recieved "power"
-            '''
-            global burst_data_oam
-            #start trasmission
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            record_duration = ui.number(
+                label='Record Duration (seconds)',
+                value=5,
+                min=1,
+                max=60,
+            ).style('width:20%')
+            warmup_duration = ui.number(
+                label='Warm-up Time (seconds)',
+                value=2,
+                min=0.5,
+            ).style('width:20%')
+
+# Containers for the two time-series plots (co-pol first, then cross-pol)
+        ts_plot_co   = ui.image('').style('width:80%; display:none')
+        ts_plot_cross = ui.image('').style('width:80%; display:none')
+
+# Storage shared between button callbacks
+        _ts_data = {'copol': None, 'xpol': None}
+
+        async def gen_time_series_received_power(channel_label: str, plot_widget, store_key: str):
+            """
+            Start TX, warm up, flush stale buffers, record received power
+            for `record_duration` seconds at ~20 Hz, then save and display a plot.
+
+            channel_label  : 'Co-polarized' or 'Cross-polarized' (for plot title)
+            plot_widget    : the ui.image element to update
+            store_key      : 'copol' or 'xpol' – key in _ts_data
+            """
+            duration   = float(record_duration.value)
+            warmup_s   = float(warmup_duration.value)
+            n_samples  = int(duration * 20)         # 20 Hz
+
+            ui.notify(f'Starting TX — warming up for {warmup_s}s …', type='info')
+
+            # 1. Start transmission
             tx()
-            time.sleep(SETTLE_TIME)
-            discard_buffer() #discard stale rx buffer
-            energy_values = []
+            await asyncio.sleep(warmup_s)           # let PA and VGA settle
 
-            num_samples = int(duration/sample_interval)
-            start_time = time.time()
-            for i in range(num_samples):
-                energy = get_energy()
-                energy_values.append(energy)
-                elapsed = time.time() - start_time
-                next_tick = (i+1) * sample_interval
-                sleep_time = next_tick - elapsed
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-            #end transmission
+            # 2. Flush stale buffers (discard a few reads)
+            for _ in range(3):
+                discard_buffer()
+                await asyncio.sleep(0.01)
+
+            # 3. Record
+            ui.notify('Recording …', type='positive')
+            times   = []
+            powers  = []
+            t0      = time.time()
+            interval = duration / n_samples
+
+            for i in range(n_samples):
+                p = get_energy_fast()
+                powers.append(p)
+                times.append(time.time() - t0)
+                # pace to ~20 Hz without blocking the event loop
+                elapsed   = time.time() - t0
+                next_tick = (i + 1) * interval
+                sleep_s   = next_tick - elapsed
+                if sleep_s > 0:
+                    await asyncio.sleep(sleep_s)
+
             stop_tx()
-            #store the data
-            burst_data_oam[trial_name] ={
-                'energy': np.array(energy_values)
-            }
-            ui.notify("successfully recorded burst")
-    
-#Set up containers for images to be placed in later
-        baseline_container=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:4; width:90%;')
-        scatterer_container=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:8; width:90%;')
-        difference_container=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:11; width:90%;')
 
-        baseline_container_plane=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:17; width:90%;')
+            # 4. Smooth and store
+            smoothed = moving_average(np.array(powers), window=8)
+            t_smooth  = np.array(times[:len(smoothed)])
+            _ts_data[store_key] = smoothed          # save for animation
 
-        scatterer_container_plane=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:21; width:90%;')
+            # 5. Plot
+            fig, ax = plt.subplots(figsize=(9, 3.5))
+            ax.plot(times, powers,    alpha=0.35, color='steelblue', linewidth=0.8, label='raw')
+            ax.plot(t_smooth, smoothed, color='steelblue', linewidth=1.8, label='smoothed')
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel('Received Power (arb.)')
+            ax.set_title(f'{channel_label} Backscattered Power vs Time')
+            ax.legend(fontsize=8)
+            ax.grid(True, alpha=0.3)
+            fig.tight_layout()
 
-        difference_container_plane=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:24; width:90%;')
+            path = f'media/ts_{store_key}.png'
+            fig.savefig(path, dpi=120)
+            plt.close(fig)
 
-        comparison_container=ui.row()\
-            .classes('justify-center items-center')\
-            .style('order:27; width: 90%')
-        
-        def plot_no_scatterer(plane=False):
-            ''' Record burst data then plot it '''
-            global burst_data_oam
-            if not plane:
-                record_burst('baseline')
-                e_b = burst_data_oam['baseline']['energy']
-                title_suffix = 'Baseline (Structured Wave)'
-                save_path = 'media/baseline.png'
-            else:
-                record_burst('baseline_plane')
-                e_b = burst_data_oam['baseline_plane']['energy']
-                title_suffix = 'Baseline (Plane Wave)'
-                save_path = 'media/baseline_plane.png'
-            
-            # Calculate average
-            e_b_avg = np.mean(e_b[1:])
-            
-            # Number of samples
-            x = np.arange(len(e_b))
-            
-            plt.figure(figsize=(8,5))
-            # Plot individual samples with reduced opacity
-            plt.plot(x[1:], e_b[1:], '-o', alpha=0.3, label='Individual Samples')
-            # Plot average line
-            plt.axhline(y=e_b_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_b_avg:.4f}')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Received")
-            plt.title(f'Energy Burst Measurement - {title_suffix}')
-            plt.grid(True)
-            plt.legend(loc='best')
-            plt.savefig(save_path)
-            plt.close()
-            
-            # Update ui image
-            if not plane:
-                baseline_container.clear()
-                with baseline_container:
-                    ui.image('media/baseline.png').style('width:60%;').force_reload()
-            else:
-                baseline_container_plane.clear()
-                with baseline_container_plane:
-                    ui.image('media/baseline_plane.png').style('width:60%;').force_reload()
+            plot_widget.set_source(path + f'?v={int(time.time())}')   # force-reload trick
+            plot_widget.style('width:80%; display:block')
+            ui.notify(f'{channel_label} recording complete!', type='positive')
 
+        ui.label('Press to record co-polarized (receive array aligned with transmit):') \
+            .classes('text-lg')
+        ui.button(
+            'Record Co-pol Time Series',
+            on_click=lambda: asyncio.create_task(
+                gen_time_series_received_power('Co-polarized', ts_plot_co, 'copol')
+            )
+        )
+        ts_plot_co  # display here in layout
 
-        def plot_scatterer(plane=False):
-            ''' Record burst data then plot it '''
-            global burst_data_oam
-            if not plane:
-                record_burst('scatterer')
-                e_s = burst_data_oam['scatterer']['energy']
-            else:
-                record_burst('scatterer_plane')
-                e_s = burst_data_oam['scatterer_plane']['energy']
-            
-            # Calculate average
-            e_s_avg = np.mean(e_s[1:])
-            
-            # Number of samples
-            x = np.arange(len(e_s))
-            
-            plt.figure(figsize=(8,5))
-            # Plot individual samples with reduced opacity
-            plt.plot(x[1:], e_s[1:], '-o', alpha=0.3, label='Individual Samples')
-            # Plot average line
-            plt.axhline(y=e_s_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_s_avg:.4f}')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Scatterer')
-            plt.grid(True)
-            plt.legend(loc='best')
-            
-            if not plane:
-                plt.savefig('media/scatterer_burst.png')
-            else:
-                plt.savefig('media/scatterer_burst_plane.png')
-            plt.close()
-            
-            # Update ui image
-            if not plane:
-                scatterer_container.clear()
-                with scatterer_container:
-                    ui.image('media/scatterer_burst.png').style('width:60%;').force_reload()
-            else:
-                scatterer_container_plane.clear()
-                with scatterer_container_plane:
-                    ui.image('media/scatterer_burst_plane.png').style('width:60%').force_reload()
+        ui.label('Step 4: Rotate Receive Array and Record Cross-polarized Power') \
+            .classes('text-2xl font-bold text-center')
+        with ui.row().classes('w-full justify-center items-center gap-4'):
+            ui.image('media/cross_pol_meas.png').style('width:50%')
 
+        ui.label('Press to record cross-polarized (receive array rotated 90°):') \
+            .classes('text-lg')
+        ui.button(
+            'Record Cross-pol Time Series',
+            on_click=lambda: asyncio.create_task(
+                gen_time_series_received_power('Cross-polarized', ts_plot_cross, 'xpol')
+            )
+        )
+        ts_plot_cross  # display here in layout
 
-        def plot_difference(plane=False):
-            ''' Plot scattered - baseline '''
-            if not plane:
-                e_diff = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
-            else:
-                e_diff = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline_plane']['energy']
-            
-            # Calculate average
-            e_diff_avg = np.mean(e_diff[1:])
-            
-            x = np.arange(len(e_diff))
-            
-            plt.figure(figsize=(8,5))
-            # Plot individual samples with reduced opacity
-            plt.plot(x[1:], e_diff[1:], '-o', alpha=0.3, label='Individual Samples')
-            # Plot average line
-            plt.axhline(y=e_diff_avg, color='r', linestyle='--', linewidth=2, label=f'Average: {e_diff_avg:.4f}')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Received")
-            plt.title('Energy Burst Measurement - Difference')
-            plt.grid(True)
-            plt.legend(loc='best')
-            
-            if not plane:
-                plt.savefig('media/power_diff.png')
-            else:
-                plt.savefig('media/power_diff_plane.png')
-            plt.close()
-            
-            # Update ui image
-            if not plane:
-                difference_container.clear()
-                with difference_container:
-                    ui.image('media/power_diff.png').style('width:60%;').force_reload()
-            else:
-                difference_container_plane.clear()
-                with difference_container_plane:
-                    ui.image('media/power_diff_plane.png').style('width:60%;').force_reload()
+# ─── Step 5: Polarization animation ──────────────────────────────────────────
 
+        ui.label('Step 5: View Polarization State as a Function of Time') \
+            .classes('text-2xl font-bold text-center')
+        ui.label(
+            'After both time series are recorded, generate the polarization animation. '
+            'The circle shows the instantaneous polarization state: co-pole on Y, '
+            'cross-pole on X, and the arc sweeps to the resultant vector.'
+        )
 
-        def plot_comparison():
-            e_diff_structured = burst_data_oam['scatterer']['energy'] - burst_data_oam['baseline']['energy']
-            e_diff_plane = burst_data_oam['scatterer_plane']['energy'] - burst_data_oam['baseline_plane']['energy']
-            
-            # Calculate averages
-            e_diff_structured_avg = np.mean(e_diff_structured[1:])
-            e_diff_plane_avg = np.mean(e_diff_plane[1:])
-            
-            x = np.arange(len(e_diff_structured))
-            
-            # Plot comparison
-            plt.figure(figsize=(8,5))
-            # Plot individual samples with reduced opacity
-            plt.plot(x[1:], e_diff_structured[1:], '-o', alpha=0.3, color='C0', label='Structured Wave (samples)')
-            plt.plot(x[1:], e_diff_plane[1:], '-o', alpha=0.3, color='C1', label='Plane Wave (samples)')
-            # Plot average lines
-            plt.axhline(y=e_diff_structured_avg, color='C0', linestyle='--', linewidth=2, 
-                        label=f'Structured Avg: {e_diff_structured_avg:.4f}')
-            plt.axhline(y=e_diff_plane_avg, color='C1', linestyle='--', linewidth=2, 
-                        label=f'Plane Avg: {e_diff_plane_avg:.4f}')
-            plt.xlabel("Samples")
-            plt.ylabel("Average Power Difference")
-            plt.title("Energy Burst Measurement - Experiment Comparison")
-            plt.grid(True)
-            plt.legend(loc="best")
-            
-            # Save to file
-            plt.savefig('media/power_diff_comparison.png')
-            plt.close()
-            
-            # Update UI
-            comparison_container.clear()
-            with comparison_container:
-                ui.image('media/power_diff_comparison.png').style('width:60%;').force_reload()
+        anim_image = ui.image('').style('width:60%; display:none')
 
-        def send_phases_for_planewave(theta, phi):
+        def gen_polarization_animation():
+            """
+            Build a matplotlib FuncAnimation from the two stored time series.
+            The circle diagram shows:
+              - Blue  arrow  → cross-pole component (X axis)
+              - Green arrow  → co-pole component    (Y axis)
+              - Orange dashed → resultant vector
+              - Red arc       → angle from cross-pole axis to resultant
+            Saves as an animated GIF and shows it via ui.image.
+            """
+            copol = _ts_data.get('copol')
+            xpol  = _ts_data.get('xpol')
 
-            phases = runAF_Calc(DX, DY, theta, phi)
-            try: 
-                send_phases(phases)
-            except Exception as e:
-                ui.notify(f'Failed to send phases: {e}', color = 'red')
-            else:
-                ui.notify('Sucessfully sent phases')
+            if copol is None or xpol is None:
+                ui.notify('Please record BOTH co-pol and cross-pol time series first.', type='warning')
+                return
 
-        # Step 3: measure baseline (structured wave)
-        ui.label("Step 3: Measure Baseline (Structured Wave)").style('order: 1;')
-        ui.image('media/Step2.jpeg').style('order: 2; width: 30%;')
-        ui.button("Start", on_click=plot_no_scatterer).style('order: 3;')
-        # baseline_container has order: 4
+            # Match lengths (they may differ slightly due to timing jitter)
+            n = min(len(copol), len(xpol))
+            copol, xpol = copol[:n], xpol[:n]
 
-        # Step 4: measure scattering (structured wave)
-        ui.label("Step 4: Measure Scattering (Structured Wave)").style('order: 5;')
-        ui.image('media/Step3.jpeg').style('order: 6; width: 30%;')
-        ui.button("Start", on_click=plot_scatterer).style('order: 7;')
-        # scatterer_container has order: 8
+            # Normalise to 0-1 so both fit inside the unit circle
+            max_val = max(copol.max(), xpol.max()) or 1.0
+            copol_n = copol / max_val
+            xpol_n  = xpol  / max_val
 
-        # Step 5: show difference (structured wave)
-        ui.label("Step 5: Show Difference (Structured Wave)").style('order: 9;')
-        ui.button("Show Difference", on_click=plot_difference).style('order: 10;')
-        # difference_container has order: 11
+            fig, ax = plt.subplots(figsize=(5, 5))
+            ax.set_aspect('equal')
+            ax.set_xlim(-1.25, 1.25)
+            ax.set_ylim(-1.25, 1.25)
+            ax.set_facecolor('#1a1a1a')
+            fig.patch.set_facecolor('#1a1a1a')
 
-        # Step 6: User estimate the angle to the scatterer given the coordinate system: 
-        ui.label("Step 6: Approximate Scatterer Location to Illuminate with Standard Plane Wave").style('order:12')
-        ui.label("Use the following coordinate system to define your angles").style('order:13')
-        with ui.row().classes('w-full justify-left items-center').style('order: 14'):
-            ui.image('media/Default_Array.png').style('width: 35%;')
-            ui.image('media/Default_Array2.png').style('width: 35%;')
+            # Unit circle
+            theta = np.linspace(0, 2 * np.pi, 300)
+            ax.plot(np.cos(theta), np.sin(theta), color='#444', linewidth=0.8)
 
-        with ui.row().classes('w-full justify-center items-center').style('order: 15;'):
-            theta = ui.number(
-                label = 'Theta (deg)',
-                value=0,
-                min = 0, max=90
-            ).style('width:20%')
+            # Axis lines
+            ax.axhline(0, color='#333', linewidth=0.5)
+            ax.axvline(0, color='#333', linewidth=0.5)
 
-            phi = ui.number(
-                label = 'Phi (deg)',
-                value=0,
-                min = 0, max = 360
-            ).style('width:20%')
-             
-            ui.button("Send Phases", on_click=lambda: send_phases_for_planewave(theta.value,phi.value))
-    
-        # Step 7: Measure baseline (plane wave)
-        ui.label("Step 7: Measure Baseline (Plane Wave)").style('order: 16;')
-        ui.button("Start", on_click=lambda:plot_no_scatterer(plane=True)).style('order: 16;')
-        # baseline_container_plane has order: 17
+            # Axis labels
+            ax.text( 1.18, 0.04, 'cross-pole', color='#888', fontsize=7, ha='right')
+            ax.text( 0.04, 1.18, 'co-pole',    color='#888', fontsize=7, ha='left')
+            ax.text( 0, -1.22, 'Polarization State', color='#aaa',
+                     fontsize=9, ha='center', va='top', fontweight='bold')
 
-        # Step 8: Measure Scattering (plane wave)
-        ui.label("Step 8: Measure Scattering (Plane Wave)").style('order: 18;')
-        ui.image('media/Step3.jpeg').style('order: 19; width: 30%;')
-        ui.button("Start", on_click=lambda:plot_scatterer(plane=True)).style('order: 20;')
-        # scatterer_container_plane has order: 21
+            # Animated artists
+            vec_x,  = ax.plot([], [], color='#378ADD', linewidth=2.5)   # cross-pole
+            arr_x   = ax.annotate('', xy=(0, 0), xytext=(0, 0),
+                                   arrowprops=dict(arrowstyle='->', color='#378ADD', lw=2))
+            vec_y,  = ax.plot([], [], color='#1D9E75', linewidth=2.5)   # co-pole
+            arr_y   = ax.annotate('', xy=(0, 0), xytext=(0, 0),
+                                   arrowprops=dict(arrowstyle='->', color='#1D9E75', lw=2))
+            vec_r,  = ax.plot([], [], color='#EF9F27', linewidth=1.8,
+                              linestyle='--')                             # resultant
+            arc_patch = plt.matplotlib.patches.Arc(
+                (0, 0), 0.5, 0.5, angle=0, theta1=0, theta2=0,
+                color='#D85A30', linewidth=2
+            )
+            ax.add_patch(arc_patch)
+            time_txt = ax.text(-1.2, 1.15, '', color='#aaa', fontsize=8)
 
-        # Step 9: Perform Subtraction (plane wave)
-        ui.label("Step 9: Show Difference (Plane Wave - Baseline)").style('order: 22;')
-        ui.button("Show Difference", on_click=lambda:plot_difference(plane=True)).style('order: 23;')
-        # difference_container_plane has order: 24
+            def init():
+                vec_x.set_data([], [])
+                vec_y.set_data([], [])
+                vec_r.set_data([], [])
+                return vec_x, vec_y, vec_r, arc_patch, time_txt
 
-        # Step 10: Compare the plane wave illumination and structured illumination scattering 
-        ui.label("Step 10: Compare the scattering under different illuminations").style('order: 25;')
-        ui.button('Compare', on_click=lambda:plot_comparison()).style('order: 26;')
-        # comparison_container has order: 27
-        
+            def update(i):
+                cx_val = float(xpol_n[i])   # cross-pole → X
+                cy_val = float(copol_n[i])  # co-pole    → Y
 
+                # Vectors from origin
+                vec_x.set_data([0, cx_val], [0, 0])
+                vec_y.set_data([0, 0],      [0, cy_val])
+
+                # Resultant
+                vec_r.set_data([0, cx_val], [0, cy_val])
+
+                # Arc: from 0° (cross-pole axis) to resultant angle
+                angle_deg = np.degrees(np.arctan2(cy_val, cx_val))
+                arc_patch.theta1 = 0
+                arc_patch.theta2 = angle_deg
+
+                # Arrow tips (re-draw annotations by updating xy)
+                arr_x.xy     = (cx_val, 0)
+                arr_x.xytext = (cx_val * 0.85, 0)
+                arr_y.xy     = (0, cy_val)
+                arr_y.xytext = (0, cy_val * 0.85)
+
+                t_s = i / 20.0
+                time_txt.set_text(f't = {t_s:.2f}s  |  θ = {angle_deg:.1f}°')
+
+                return vec_x, vec_y, vec_r, arc_patch, time_txt
+
+            # Subsample to keep GIF manageable (max 200 frames at 10 fps = 20s)
+            step   = max(1, n // 200)
+            frames = list(range(0, n, step))
+
+            ani = animation.FuncAnimation(
+                fig, update, frames=frames, init_func=init,
+                blit=False, interval=100        # 100 ms → 10 fps
+            )
+
+            path = 'media/polarization_anim.gif'
+            writer = animation.PillowWriter(fps=10)
+            ani.save(path, writer=writer)
+            plt.close(fig)
+
+            anim_image.set_source(path + f'?v={int(time.time())}')
+            anim_image.style('width:60%; display:block')
+            ui.notify('Animation ready!', type='positive')
+
+        ui.button('Generate Polarization Animation', on_click=gen_polarization_animation)
+        anim_image
 #----END OAM MODE ----
 
 
@@ -921,7 +859,7 @@ def hermite_page():
                     .on('click', lambda _, t=target: select_image(t))
                 image_elements[target] = img #store reference
         #Step 2: Find Beam Direction
-        ui.label('Step2: Confirm Main Beam Direction')
+        ui.label('Step 2: Confirm Main Beam Direction')
         ui.image('media/Step1.jpeg').style('width:30%')  
 
         with ui.row().classes('w-full justify-center items-center'):

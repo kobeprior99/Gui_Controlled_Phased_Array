@@ -5,6 +5,7 @@ from matplotlib.animation import FuncAnimation
 import numpy as np
 from config import *
 import PIL
+
 def LGlpz(l, p, z0, w0, lambda0, xs, ys):
     """
     Computes the complex electric field distribution of a Laguerre–Gaussian mode LG_p^l

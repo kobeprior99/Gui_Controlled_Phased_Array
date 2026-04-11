@@ -29,11 +29,13 @@ try:
     TONE *= 2**14 #required by PLUTO 
 except:
     print('No PLUTO attached')
+
 def tx():
     '''Send the tone'''
     global TX_ACTIVE
     sdr.tx(TONE)
     TX_ACTIVE=True
+
 def stop_tx():
     '''stop transmitting by deleting the buffer'''
     #check if tx is active though 

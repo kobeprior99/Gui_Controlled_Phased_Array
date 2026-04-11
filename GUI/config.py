@@ -35,5 +35,12 @@ BUFFER_SIZE = 4*2048
 NUM_AVG = 1
 SETTLE_TIME = 1 #time to transmit before capturing burst
 
+OAM_PHASES = np.array([
+        130.58, 105.93, 74.07, 49.42,
+        158.73, 130.58, 49.42, 21.27,
+        -158.73, -130.58, -49.42, -21.27,
+        -130.58, -105.93, -74.07, -49.42,
+    ]) 
+
 #calibration directory
 S2PDIR = 'S2P_4-9'
