@@ -30,14 +30,12 @@ from nicegui import ui,app
 import numpy as np 
 from config import OAM_PHASES,BAUDRATE, DX, DY, THETA_RANGE, PHI_RANGE, FREQ,SETTLE_TIME
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy, get_energy_fast,discard_buffer, tx, stop_tx, moving_average
+from PLUTO import get_energy,get_mean_dev, get_energy_fast,discard_buffer, tx, stop_tx, moving_average
 import plotly.graph_objects as go
 MEDIA_DIR = os.path.join(os.path.dirname(__file__), 'media')
 #global serial handler
@@ -476,7 +474,7 @@ def oam_page():
         fig.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
             xaxis_title='Time(s)',
-            yaxis_title='Avg Power Received'
+            yaxis_title='Avg Power Received (abr.)'
         )
         live_plot = ui.plotly(fig).classes('w-3/4 h-64')
         image_container = ui.row()\
@@ -530,112 +528,148 @@ def oam_page():
         )
         stop_button.visible = False            
      
-        
-# ─── Step 3 / 4: Time-series measurement ─────────────────────────────────────
+# ─── Step 3: Noise Floor ───────────────────────────────────────────────────
+        _ts_data = {'copol': None, 'xpol': None, 'noise': None}
 
-        ui.label('Step 3: Record Backscattered Power Time Series') \
+        ui.label('Step 3: Measure Noise Floor') \
+            .classes('text-2xl font-bold text-center')
+        ui.label(
+            'With TX off, record the receiver noise floor. '
+            'No transmission should occur during this step.'
+        ).classes('text-base')
+
+        noise_plot = ui.image('').style('width:50%; display:none')
+
+        async def record_noise_floor():
+            ui.notify('Recording noise floor (TX off) …', type='info')
+            num_samples = 100
+            for _ in range(10):
+                discard_buffer()
+            power_samples = [get_energy_fast() for _ in range(num_samples)]
+            noise_mean = np.mean(power_samples)
+            noise_std = np.std(power_samples)
+            _ts_data['noise'] = {'mean': noise_mean, 'std': noise_std}
+
+            fig, ax = plt.subplots(figsize=(5, 4))
+            ax.errorbar(
+                [0], [noise_mean],
+                yerr=[[3 * noise_std], [3 * noise_std]],
+                fmt='o',
+                color='#888',
+                ecolor='#888',
+                elinewidth=2,
+                capsize=12,
+                capthick=2,
+                markersize=10,
+                label=f'mean = {noise_mean:.4g}\n±3σ = {3 * noise_std:.4g}'
+            )
+            ax.set_xlim(-0.5, 0.5)
+            ax.set_xticks([])
+            ax.set_ylabel('Received Power (arb.)')
+            ax.set_title(f'Noise Floor — Mean Received Power\n(over n = {num_samples} sample buffers, TX off)')
+            ax.legend(fontsize=9, loc='upper right')
+            ax.grid(True, axis='y', alpha=0.3)
+            fig.tight_layout()
+
+            path = 'media/ts_noise.png'
+            fig.savefig(path, dpi=120)
+            plt.close(fig)
+
+            noise_plot.set_source(path)
+            noise_plot.force_reload()
+            noise_plot.style('width:50%; display:block')
+            ui.notify('Noise floor recorded!', type='positive')
+
+        ui.button('Record Noise Floor', on_click=record_noise_floor)
+        noise_plot
+        
+
+
+# ─── Step 3 / 4: avg+errorbar-series measurement ─────────────────────────────────────
+        ui.label('Step 4: Record Backscattered Power ') \
             .classes('text-2xl font-bold text-center')
         with ui.row().classes('w-full justify-center items-center gap-4'):
             ui.image('media/scatterer_location.png').style('width:40%')
             ui.image('media/monostatic.png').style('width:40%')
 
-        with ui.row().classes('w-full justify-center items-center gap-4'):
-            record_duration = ui.number(
-                label='Record Duration (seconds)',
-                value=5,
-                min=1,
-                max=60,
-            ).style('width:20%')
-            warmup_duration = ui.number(
-                label='Warm-up Time (seconds)',
-                value=2,
-                min=0.5,
-            ).style('width:20%')
-
-# Containers for the two time-series plots (co-pol first, then cross-pol)
-        ts_plot_co   = ui.image('').style('width:80%; display:none')
+        ts_plot_co    = ui.image('').style('width:80%; display:none')
         ts_plot_cross = ui.image('').style('width:80%; display:none')
 
-# Storage shared between button callbacks
-        _ts_data = {'copol': None, 'xpol': None}
 
-        async def gen_time_series_received_power(channel_label: str, plot_widget, store_key: str):
-            """
-            Start TX, warm up, flush stale buffers, record received power
-            for `record_duration` seconds at ~20 Hz, then save and display a plot.
+        async def gen_average_received_power(channel_label: str, plot_widget, store_key: str):
+            noise = _ts_data.get('noise')
+            num_samples = 100
+            if noise is None:
+                ui.notify('Please record the noise floor first!' , type='warning')
+                return
 
-            channel_label  : 'Co-polarized' or 'Cross-polarized' (for plot title)
-            plot_widget    : the ui.image element to update
-            store_key      : 'copol' or 'xpol' – key in _ts_data
-            """
-            duration   = float(record_duration.value)
-            warmup_s   = float(warmup_duration.value)
-            n_samples  = int(duration * 20)         # 20 Hz
-
-            ui.notify(f'Starting TX — warming up for {warmup_s}s …', type='info')
-
-            # 1. Start transmission
+            ui.notify('Starting TX — warming up for 2s …', type='info')
             tx()
-            await asyncio.sleep(warmup_s)           # let PA and VGA settle
+            await asyncio.sleep(2)
 
-            # 2. Flush stale buffers (discard a few reads)
-            for _ in range(3):
+            for _ in range(10):
                 discard_buffer()
-                await asyncio.sleep(0.01)
 
-            # 3. Record
             ui.notify('Recording …', type='positive')
-            times   = []
-            powers  = []
-            t0      = time.time()
-            interval = duration / n_samples
-
-            for i in range(n_samples):
-                p = get_energy_fast()
-                powers.append(p)
-                times.append(time.time() - t0)
-                # pace to ~20 Hz without blocking the event loop
-                elapsed   = time.time() - t0
-                next_tick = (i + 1) * interval
-                sleep_s   = next_tick - elapsed
-                if sleep_s > 0:
-                    await asyncio.sleep(sleep_s)
-
+            power_samples = [get_energy_fast() for _ in range(num_samples)]
+            raw_mean = np.mean(power_samples)
+            raw_std = np.std(power_samples)
             stop_tx()
 
-            # 4. Smooth and store
-            smoothed = moving_average(np.array(powers), window=8)
-            t_smooth  = np.array(times[:len(smoothed)])
-            _ts_data[store_key] = smoothed          # save for animation
+            # Power above noise floor; uncertainties add in quadrature
+            average_power      = raw_mean - noise['mean']
+            # uncertainty adds in quadrature
+            standard_deviation = np.sqrt(raw_std**2 + noise['std']**2)
 
-            # 5. Plot
-            fig, ax = plt.subplots(figsize=(9, 3.5))
-            ax.plot(times, powers,    alpha=0.35, color='steelblue', linewidth=0.8, label='raw')
-            ax.plot(t_smooth, smoothed, color='steelblue', linewidth=1.8, label='smoothed')
-            ax.set_xlabel('Time (s)')
-            ax.set_ylabel('Received Power (arb.)')
-            ax.set_title(f'{channel_label} Backscattered Power vs Time')
-            ax.legend(fontsize=8)
-            ax.grid(True, alpha=0.3)
+
+            _ts_data[store_key] = {'mean': average_power, 'std': standard_deviation}
+
+            fig, ax = plt.subplots(figsize=(5, 4))
+            ax.errorbar(
+                [0], [average_power],
+                yerr=[[3 * standard_deviation], [3 * standard_deviation]],
+                fmt='o',
+                color='steelblue',
+                ecolor='steelblue',
+                elinewidth=2,
+                capsize=12,
+                capthick=2,
+                markersize=10,
+                label=f'mean = {average_power:.4g}\n±3σ = {3 * standard_deviation:.4g}'
+            )
+
+            # Shade the noise floor ±3σ band for reference
+            ax.axhspan(
+                -3 * noise['std'], 3 * noise['std'],
+                color='#888', alpha=0.12, label=f'noise ±3σ'
+            )
+            ax.axhline(0, color='#888', linewidth=0.8, linestyle='--')
+
+            ax.set_xlim(-0.5, 0.5)
+            ax.set_xticks([])
+            ax.set_ylabel('Power above noise floor (arb.)')
+            ax.set_title(f'{channel_label} — Average Backscattered Power\n(over n = {num_samples} sample buffers, noise-subtracted)')
+            ax.legend(fontsize=9, loc='upper right')
+            ax.grid(True, axis='y', alpha=0.3)
             fig.tight_layout()
 
             path = f'media/ts_{store_key}.png'
             fig.savefig(path, dpi=120)
             plt.close(fig)
 
-            plot_widget.set_source(path )  # force-reload trick
+            plot_widget.set_source(path)
             plot_widget.force_reload()
-            plot_widget.style('width:80%; display:block')
+            plot_widget.style('width:50%; display:block')
             ui.notify(f'{channel_label} recording complete!', type='positive')
 
         ui.label('Press to record co-polarized (receive array aligned with transmit):') \
             .classes('text-lg')
         async def record_copol():
-            await gen_time_series_received_power('Co-polarized', ts_plot_co,'copol')
-        ui.button('Record Co-pol Time Series', on_click=record_copol)
-        ts_plot_co  # display here in layout
+            await gen_average_received_power('Co-polarized', ts_plot_co, 'copol')
+        ui.button('Record Co-pol Scattering', on_click=record_copol)
+        ts_plot_co
 
-        ui.label('Step 4: Rotate Receive Array and Record Cross-polarized Power') \
+        ui.label('Step 5: Rotate Receive Array and Record Cross-polarized Power') \
             .classes('text-2xl font-bold text-center')
         with ui.row().classes('w-full justify-center items-center gap-4'):
             ui.image('media/cross_pol_meas.png').style('width:50%')
@@ -643,138 +677,111 @@ def oam_page():
         ui.label('Press to record cross-polarized (receive array rotated 90°):') \
             .classes('text-lg')
         async def record_xpol():
-            await gen_time_series_received_power('Cross-polarized', ts_plot_cross,'xpol')
-        ui.button('Record Cross-pol Time Series', on_click=record_xpol)
-        ts_plot_cross  # display here in layout
+            await gen_average_received_power('Cross-polarized', ts_plot_cross, 'xpol')
+        ui.button('Record Cross-pol Scattering', on_click=record_xpol)
+        ts_plot_cross
 
-# ─── Step 5: Polarization animation ──────────────────────────────────────────
+# ─── Step 6: Polarization vector ─────────────────────────────────────────────
 
-        ui.label('Step 5: View Polarization State as a Function of Time') \
+        ui.label('Step 6: View Mean Polarization State') \
             .classes('text-2xl font-bold text-center')
         ui.label(
-            'After both time series are recorded, generate the polarization animation. '
-            'The circle shows the instantaneous polarization state: co-pole on Y, '
-            'cross-pole on X, and the arc sweeps to the resultant vector.'
+            'After both measurements are recorded, generate the polarization diagram. '
+            'The circle shows the mean polarization state: co-pole on Y, '
+            'cross-pole on X, and the resultant vector with 3σ uncertainty cone.'
         )
 
-        anim_image = ui.image('').style('width:60%; display:none')
+        pol_image = ui.image('').style('width:60%; display:none')
 
-        def gen_polarization_animation():
-            """
-            Build a matplotlib FuncAnimation from the two stored time series.
-            The circle diagram shows:
-              - Blue  arrow  → cross-pole component (X axis)
-              - Green arrow  → co-pole component    (Y axis)
-              - Orange dashed → resultant vector
-              - Red arc       → angle from cross-pole axis to resultant
-            Saves as an animated GIF and shows it via ui.image.
-            """
+        def gen_polarization_diagram():
+            num_samples = 100
             copol = _ts_data.get('copol')
             xpol  = _ts_data.get('xpol')
 
             if copol is None or xpol is None:
-                ui.notify('Please record BOTH co-pol and cross-pol time series first.', type='warning')
+                ui.notify('Please record BOTH co-pol and cross-pol measurements first.', type='warning')
                 return
 
-            # Match lengths (they may differ slightly due to timing jitter)
-            n = min(len(copol), len(xpol))
-            copol, xpol = copol[:n], xpol[:n]
+            cx_mean, cx_std = xpol['mean'],  xpol['std']   # cross-pole → X
+            cy_mean, cy_std = copol['mean'], copol['std']  # co-pole    → Y
 
-            # Normalise to 0-1 so both fit inside the unit circle
-            max_val = max(copol.max(), xpol.max()) or 1.0
-            copol_n = copol / max_val
-            xpol_n  = xpol  / max_val
+            # Normalise to unit circle
+            max_val = max(cx_mean, cy_mean) or 1.0
+            cx_n, cx_sn = cx_mean / max_val, cx_std / max_val
+            cy_n, cy_sn = cy_mean / max_val, cy_std / max_val
+
+            angle_mean = np.degrees(np.arctan2(cy_n, cx_n))
+            angle_lo   = np.degrees(np.arctan2(cy_n - 3*cy_sn, cx_n + 3*cx_sn))
+            angle_hi   = np.degrees(np.arctan2(cy_n + 3*cy_sn, cx_n - 3*cx_sn))
 
             fig, ax = plt.subplots(figsize=(5, 5))
             ax.set_aspect('equal')
-            ax.set_xlim(-1.25, 1.25)
-            ax.set_ylim(-1.25, 1.25)
+            ax.set_xlim(-1.35, 1.35)
+            ax.set_ylim(-1.35, 1.35)
             ax.set_facecolor('#e3e3e1')
             fig.patch.set_facecolor('#e3e3e3')
 
             # Unit circle
             theta = np.linspace(0, 2 * np.pi, 300)
             ax.plot(np.cos(theta), np.sin(theta), color='#444', linewidth=0.8)
+            ax.axhline(0, color='#000', linewidth=0.5)
+            ax.axvline(0, color='#000', linewidth=0.5)
 
-            # Axis lines
-            ax.axhline(0, color='#000000', linewidth=0.5)
-            ax.axvline(0, color='#000000', linewidth=0.5)
+            ax.text( 1.28, 0.04, 'cross-pole', color='#000', fontsize=7, ha='right')
+            ax.text( 0.04, 1.28, 'co-pole',    color='#000', fontsize=7, ha='left')
 
-            # Axis labels
-            ax.text( 1.18, 0.04, 'cross-pole', color='#000000', fontsize=7, ha='right')
-            ax.text( 0.04, 1.18, 'co-pole',    color='#000000', fontsize=7, ha='left')
-            ax.text( 0, -1.22, 'Return Polarization', color='#000000',
-                     fontsize=9, ha='center', va='top', fontweight='bold')
-
-            # Animated artists
-            vec_x,  = ax.plot([], [], color='#378ADD', linewidth=2.5)   # cross-pole
-            arr_x   = ax.annotate('', xy=(0, 0), xytext=(0, 0),
-                                   arrowprops=dict(arrowstyle='->', color='#378ADD', lw=2))
-            vec_y,  = ax.plot([], [], color='#1D9E75', linewidth=2.5)   # co-pole
-            arr_y   = ax.annotate('', xy=(0, 0), xytext=(0, 0),
-                                   arrowprops=dict(arrowstyle='->', color='#1D9E75', lw=2))
-            vec_r,  = ax.plot([], [], color='#EF9F27', linewidth=1.8,
-                              linestyle='--')                             # resultant
-            arc_patch = plt.matplotlib.patches.Arc(
-                (0, 0), 0.5, 0.5, angle=0, theta1=0, theta2=0,
-                color='#D85A30', linewidth=2
+            # 1σ uncertainty cone (shaded wedge between lo/hi angles)
+            wedge_angles = np.linspace(np.radians(angle_lo), np.radians(angle_hi), 60)
+            wedge_x = np.concatenate([[0], np.cos(wedge_angles)])
+            wedge_y = np.concatenate([[0], np.sin(wedge_angles)])
+            ax.fill(wedge_x, wedge_y, color='#D85A30', alpha=0.18, label='3σ uncertainty')
+            arc = plt.matplotlib.patches.Arc(
+                (0, 0), 0.45, 0.45, angle=0,
+                theta1=min(angle_lo, angle_hi), theta2=max(angle_lo, angle_hi),
+                color='#D85A30', linewidth=1.5
             )
-            ax.add_patch(arc_patch)
-            time_txt = ax.text(-1.2, 1.15, '', color='#000000', fontsize=8)
+            ax.add_patch(arc)
 
-            def init():
-                vec_x.set_data([], [])
-                vec_y.set_data([], [])
-                vec_r.set_data([], [])
-                return vec_x, vec_y, vec_r, arc_patch, time_txt
+            # Component vectors
+            ax.annotate('', xy=(cx_n, 0), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle='->', color='#378ADD', lw=2.5))
+            ax.annotate('', xy=(0, cy_n), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle='->', color='#1D9E75', lw=2.5))
 
-            def update(i):
-                cx_val = float(xpol_n[i])   # cross-pole → X
-                cy_val = float(copol_n[i])  # co-pole    → Y
+            # Component error bars
+            ax.errorbar([cx_n], [0],  xerr=3*cx_sn, fmt='none', ecolor='#378ADD', elinewidth=1.5, capsize=6)
+            ax.errorbar([0], [cy_n],  yerr=3*cy_sn, fmt='none', ecolor='#1D9E75', elinewidth=1.5, capsize=6)
 
-                # Vectors from origin
-                vec_x.set_data([0, cx_val], [0, 0])
-                vec_y.set_data([0, 0],      [0, cy_val])
+            # Resultant vector
+            ax.annotate('', xy=(cx_n, cy_n), xytext=(0, 0),
+                        arrowprops=dict(arrowstyle='->', color='#EF9F27', lw=2.2, linestyle='dashed'))
 
-                # Resultant
-                vec_r.set_data([0, cx_val], [0, cy_val])
+            ax.text(0, -1.28,
+                    f'θ = {angle_mean:.1f}°  |  n = {num_samples} sample buffers',
+                    color='#000', fontsize=8, ha='center', va='top', fontweight='bold')
 
-                # Arc: from 0° (cross-pole axis) to resultant angle
-                angle_deg = np.degrees(np.arctan2(cy_val, cx_val))
-                arc_patch.theta1 = 0
-                arc_patch.theta2 = angle_deg
+            legend_elements = [
+                plt.matplotlib.lines.Line2D([0], [0], color='#378ADD', lw=2, label='Cross-pole'),
+                plt.matplotlib.lines.Line2D([0], [0], color='#1D9E75', lw=2, label='Co-pole'),
+                plt.matplotlib.lines.Line2D([0], [0], color='#EF9F27', lw=2,
+                                            linestyle='--', label='Resultant'),
+                plt.matplotlib.patches.Patch(color='#D85A30', alpha=0.35, label='±3σ cone'),
+            ]
+            ax.legend(handles=legend_elements, fontsize=7, loc='lower right')
+            ax.set_title('Mean Scattered Polarization State', fontweight='bold')
 
-                # Arrow tips (re-draw annotations by updating xy)
-                arr_x.xy     = (cx_val, 0)
-                arr_x.xytext = (cx_val * 0.85, 0)
-                arr_y.xy     = (0, cy_val)
-                arr_y.xytext = (0, cy_val * 0.85)
-
-                t_s = i / 20.0
-                time_txt.set_text(f't = {t_s:.2f}s  |  θ = {angle_deg:.1f}°')
-
-                return vec_x, vec_y, vec_r, arc_patch, time_txt
-
-            # Subsample to keep GIF manageable (max 200 frames at 10 fps = 20s)
-            step   = max(1, n // 200)
-            frames = list(range(0, n, step))
-
-            ani = animation.FuncAnimation(
-                fig, update, frames=frames, init_func=init,
-                blit=False, interval=100        # 100 ms → 10 fps
-            )
-
-            path = 'media/polarization_anim.gif'
-            writer = animation.PillowWriter(fps=10)
-            ani.save(path, writer=writer)
+            fig.tight_layout()
+            path = 'media/polarization_diagram.png'
+            fig.savefig(path, dpi=150)
             plt.close(fig)
 
-            anim_image.set_source(path)
-            anim_image.force_reload()
-            anim_image.style('width:60%; display:block')
-            ui.notify('Animation ready!', type='positive')
-        ui.button('Generate Polarization Animation', on_click=gen_polarization_animation)
-        anim_image
+            pol_image.set_source(path)
+            pol_image.force_reload()
+            pol_image.style('width:60%; display:block')
+            ui.notify('Polarization diagram ready!', type='positive')
+
+        ui.button('Generate Polarization Diagram', on_click=gen_polarization_diagram)
+        pol_image
 #----END OAM MODE ----
 
 
