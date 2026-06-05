@@ -27,9 +27,9 @@ PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
 
 #PLUTO config
 BASE_BAND = 100e3
-SAMP_RATE = 5e6  # Hz
-TX_GAIN = -5 #dBm
-RX_GAIN =10 #adjust as needed
+SAMP_RATE = 5e6  # Hz e.g. 5 MHz
+TX_GAIN = -1 # 0 is the maximum transmit power -90 is 90 dB attenuation from max
+RX_GAIN =30 #adjust as needed 0-74
 
 #4 ms to fill buffer
 BUFFER_SIZE = 4*2048 
