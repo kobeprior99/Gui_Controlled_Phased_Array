@@ -44,4 +44,4 @@ OAM_PHASES = np.array([
     ]) 
 
 #calibration directory
-S2PDIR = 'S2P_4-9'
+S2PDIR = 'S2P_JUNE_12'
