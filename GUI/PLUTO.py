@@ -47,6 +47,14 @@ def stop_tx():
 def discard_buffer():
         sdr.rx()
 
+def get_dBFS():
+    '''
+    s is a buffer of complex samples we find the rms value of this buffer and scale it relative to full scale 
+    '''
+    s = sdr.rx()
+    rms = np.sqrt(np.mean(np.abs(s)**2))
+    return 20*np.log10(rms/2**14)  # 12-bit signed ADC packaged in a 16 bit container
+
 def get_energy() -> float:
     """
     get the tones strength

@@ -35,7 +35,7 @@ import asyncio
 from AF_Calc import runAF_Calc
 from READ_S2P import get_phase_at_freq
 from create_default_rx_grid import DEFAULT_RX_GRID
-from PLUTO import get_energy,get_mean_dev, get_energy_fast,discard_buffer, tx, stop_tx, moving_average
+from PLUTO import get_energy,get_mean_dev, get_energy_fast,discard_buffer, tx, stop_tx, moving_average, get_dBFS
 import plotly.graph_objects as go
 MEDIA_DIR = os.path.join(os.path.dirname(__file__), 'media')
 #global serial handler
@@ -256,7 +256,8 @@ def main_page():
     ('/manual', 'Manual_Phase_Control.png'), 
     ('/oam', 'OAM_Control1.png'),
     ('/hermite', 'Hermite_Control1.png'),
-    ('/beam', 'Beam_Control.png')
+    ('/beam', 'Beam_Control.png'),
+    ('/scattering', 'Scattering_Experiment.png')
     ]
 
     with ui.column().classes('w-full items-center'):
@@ -1518,8 +1519,118 @@ def calibrate():
                 on_change=lambda e, i=i: update_phase(i, e.value),
             ).props("outlined dense step=0.1").style("width:100px;")
             phase_inputs.append(num)
-
 #----END Calibration Page
+
+#----Scattering PAGE-----
+@ui.page('/scattering')
+def scattering():
+
+    ui.button('⬅ Back', on_click=nav_back)
+    with ui.column().classes('w-full items-center  gap-6 mt-6'):
+        # Header
+        ui.label('Scattering Mode Selection') \
+            .classes('text-2xl font-bold text-center')
+
+        # Instructions
+        ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
+        with ui.row().classes('w-full justify-center items-center'):
+            ui.image('media/Default_Array.png').style('width: 35%;')
+            ui.image('media/Default_Array2.png').style('width: 35%;')
+
+    oam_images = [
+    ('-3', 'oam--3.png'),
+    ('-2', 'oam-2.png'), 
+    ('-1', 'oam-1.png'),
+    ('1', 'oam1.png'),
+    ('2', 'oam2.png'),
+    ('3', 'oam3.png'),
+    ('0', 'plane_wave.png')
+    ]
+
+    hermite_images = [
+    ('01', '01.png'), 
+    ('10', '10.png'),
+    ('11', '11.png'),
+    ]
+
+    image_elements = {} # store references to each image ui element
+
+    def select_oam_image(t):
+        '''add red box around selected image and remove from old one'''
+        global selected
+        if selected is not None and selected in image_elements:
+            image_elements[selected].classes(remove='ring-4 ring-red-500')
+        image_elements[t].classes('ring-4 ring-red-500')
+        selected = t
+        oam_mode(t)
+
+    def select_hermite_image(t):
+        '''add red box around selected image and remove from old one'''
+        global selected
+        if selected is not None and selected in image_elements:
+            image_elements[selected].classes(remove='ring-4 ring-red-500')
+        image_elements[t].classes('ring-4 ring-red-500')
+        selected = t
+        hermite_mode(t)
+
+    ui.label('OAM Modes').classes('text-xl font-bold text-center mt-4')
+    with ui.row().classes('w-full justify-center items-center gap-4'):
+        for target, filename in oam_images:
+            img = ui.image(f'media/{filename}')\
+                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                .on('click', lambda _, t=target: select_oam_image(t))
+            image_elements[target] = img #store reference
+
+    ui.label('Hermite Modes').classes('text-xl font-bold text-center mt-4')
+    with ui.row().classes('w-full justify-center items-center gap-4'):
+        for target, filename in hermite_images:
+            img = ui.image(f'media/{filename}')\
+                .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
+                .on('click', lambda _, t=target: select_hermite_image(t))
+            image_elements[target] = img #store reference
+
+    # ---- Noise Measurement (dBFS) ----
+    ui.label('Noise Measurement').classes('text-2xl font-bold text-center mt-6')
+    ui.label('Press the button below to record and report the receiver noise level in dBFS.')\
+        .classes('text-base text-gray-600 text-center')
+
+    noise_label = ui.label('').classes('text-xl font-bold text-center mt-2')
+
+    def record_noise_dbfs():
+        try:
+            dbfs = get_dBFS()
+        except Exception as e:
+            ui.notify(f'Failed to measure noise: {e}', color='red')
+            return
+        noise_label.set_text(f'Noise Level: {dbfs:.2f} dBFS')
+        ui.notify('Noise measurement complete', type='positive')
+
+    ui.button('Record Noise (dBFS)', on_click=record_noise_dbfs)
+    
+    # ---- TX Noise Measurement (dBFS while transmitting) ----
+    ui.label('Transmit Power Measurement').classes('text-2xl font-bold text-center mt-6')
+    ui.label('Press the button below to transmit and record the received power level in dBFS.')\
+        .classes('text-base text-gray-600 text-center')
+
+    tx_dbfs_label = ui.label('').classes('text-xl font-bold text-center mt-2')
+
+    def record_tx_dbfs():
+        try:
+            tx()
+            for _ in range(10):
+                discard_buffer()
+            dbfs = get_dBFS()
+        except Exception as e:
+            ui.notify(f'Failed to measure TX power: {e}', color='red')
+            return
+        finally:
+            stop_tx()
+        tx_dbfs_label.set_text(f'TX Power Level: {dbfs:.2f} dBFS')
+        ui.notify('TX power measurement complete', type='positive')
+
+    ui.button('Record TX Power (dBFS)', on_click=record_tx_dbfs)
+#----END Scattering PAGE
+
 
 # ---- RUN APP ---
 ui.run(title="Phase Network Control Dashboard",reload=False)
