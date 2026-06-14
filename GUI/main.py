@@ -1589,46 +1589,51 @@ def scattering():
                 .on('click', lambda _, t=target: select_hermite_image(t))
             image_elements[target] = img #store reference
 
-    # ---- Noise Measurement (dBFS) ----
+# ---- Noise Measurement (dBFS) ----
     ui.label('Noise Measurement').classes('text-2xl font-bold text-center mt-6')
     ui.label('Press the button below to record and report the receiver noise level in dBFS.')\
         .classes('text-base text-gray-600 text-center')
 
     noise_label = ui.label('').classes('text-xl font-bold text-center mt-2')
+    noise_dbfs_value = {'value': None}
 
     def record_noise_dbfs():
         try:
+            for _ in range(100):
+                discard_buffer()
             dbfs = get_dBFS()
         except Exception as e:
             ui.notify(f'Failed to measure noise: {e}', color='red')
             return
+        noise_dbfs_value['value'] = dbfs
         noise_label.set_text(f'Noise Level: {dbfs:.2f} dBFS')
         ui.notify('Noise measurement complete', type='positive')
 
     ui.button('Record Noise (dBFS)', on_click=record_noise_dbfs)
     
-    # ---- TX Noise Measurement (dBFS while transmitting) ----
-    ui.label('Transmit Power Measurement').classes('text-2xl font-bold text-center mt-6')
-    ui.label('Press the button below to transmit and record the received power level in dBFS.')\
+    # ---- Backscattered Power Measurement (dBFS while transmitting) ----
+    ui.label('Backscattered Power Measurement').classes('text-2xl font-bold text-center mt-6')
+    ui.label('Press the button below to transmit and record the backscattered power above the noise floor.')\
         .classes('text-base text-gray-600 text-center')
-
     tx_dbfs_label = ui.label('').classes('text-xl font-bold text-center mt-2')
-
     def record_tx_dbfs():
+        if noise_dbfs_value['value'] is None:
+            ui.notify('Please record the noise floor first!', type='warning')
+            return
         try:
             tx()
-            for _ in range(10):
+            for _ in range(100):
                 discard_buffer()
             dbfs = get_dBFS()
         except Exception as e:
-            ui.notify(f'Failed to measure TX power: {e}', color='red')
+            ui.notify(f'Failed to measure backscattered power: {e}', color='red')
             return
         finally:
             stop_tx()
-        tx_dbfs_label.set_text(f'TX Power Level: {dbfs:.2f} dBFS')
-        ui.notify('TX power measurement complete', type='positive')
-
-    ui.button('Record TX Power (dBFS)', on_click=record_tx_dbfs)
+        rel_power = dbfs - noise_dbfs_value['value']
+        tx_dbfs_label.set_text(f'Backscattered Power Above Noise: {rel_power:.2f} dB')
+        ui.notify('Backscattered power measurement complete', type='positive')
+    ui.button('Record Backscattered Power Above Noise', on_click=record_tx_dbfs)
 #----END Scattering PAGE
 
 
