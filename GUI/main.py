@@ -432,6 +432,7 @@ def oam_page():
                     .on('click', lambda _, t=target: select_image(t))
                 image_elements[target] = img #store reference
 
+
     @ui.page('/scattering_experiment')
     def scattering_experiment():
         ui.button('⬅ Back', on_click=nav_back)
