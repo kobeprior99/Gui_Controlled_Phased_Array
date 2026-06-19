@@ -254,8 +254,8 @@ def main_page():
     images = [
     ('/calibrate', 'Calibration.png'),
     ('/manual', 'Manual_Phase_Control.png'), 
-    ('/oam', 'OAM_Control1.png'),
-    ('/hermite', 'Hermite_Control1.png'),
+    # ('/oam', 'OAM_Control1.png'),
+    # ('/hermite', 'Hermite_Control1.png'),
     ('/beam', 'Beam_Control.png'),
     ('/scattering', 'Scattering_Experiment.png')
     ]
@@ -1598,19 +1598,23 @@ def scattering():
     noise_label = ui.label('').classes('text-xl font-bold text-center mt-2')
     noise_dbfs_value = {'value': None}
 
-    def record_noise_dbfs():
+    def record_noise_and_coupling_dbfs():
         try:
+            tx()
             for _ in range(100):
                 discard_buffer()
             dbfs = get_dBFS()
+            stop_tx()
         except Exception as e:
             ui.notify(f'Failed to measure noise: {e}', color='red')
+        finally:
+            stop_tx()
             return
         noise_dbfs_value['value'] = dbfs
         noise_label.set_text(f'Noise Level: {dbfs:.2f} dBFS')
         ui.notify('Noise measurement complete', type='positive')
 
-    ui.button('Record Noise (dBFS)', on_click=record_noise_dbfs)
+    ui.button('Record Noise and coupling(dBFS)', on_click=record_noise_and_coupling_dbfs)
     
     # ---- Backscattered Power Measurement (dBFS while transmitting) ----
     ui.label('Backscattered Power Measurement').classes('text-2xl font-bold text-center mt-6')
