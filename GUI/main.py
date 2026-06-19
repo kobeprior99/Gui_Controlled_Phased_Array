@@ -1607,14 +1607,14 @@ def scattering():
             stop_tx()
         except Exception as e:
             ui.notify(f'Failed to measure noise: {e}', color='red')
+            return
         finally:
             stop_tx()
-            return
         noise_dbfs_value['value'] = dbfs
         noise_label.set_text(f'Noise Level: {dbfs:.2f} dBFS')
         ui.notify('Noise measurement complete', type='positive')
 
-    ui.button('Record Noise and coupling(dBFS)', on_click=record_noise_and_coupling_dbfs)
+    ui.button('Record Noise and coupling (dBFS)', on_click=record_noise_and_coupling_dbfs)
     
     # ---- Backscattered Power Measurement (dBFS while transmitting) ----
     ui.label('Backscattered Power Measurement').classes('text-2xl font-bold text-center mt-6')
