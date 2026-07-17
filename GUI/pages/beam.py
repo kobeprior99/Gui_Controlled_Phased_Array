@@ -59,6 +59,10 @@ def transmit_mode():
             y_min = ui.number(label='Set Minimum Power for Graph', value=0, min=1).style('width:30%') 
             y_max = ui.number(label='Set Maximum Power for Graph', value=10, min=1).style('width:30%')
 
+        # Added a toggle switch to let the user select between Linear and Logarithmic scales
+        with ui.row().classes('w-full justify-center items-center m-2'):
+            scale_type = ui.toggle({'linear': 'Linear', 'log': 'Logarithmic'}, value='linear')
+
         fig = go.Figure(go.Scatter(x=[], y=[], mode='lines', name='Received Energy'))
         fig.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
@@ -99,12 +103,22 @@ def transmit_mode():
                 
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
+                
                 try:
-                    fig.update_yaxes(range=[int(y_min.value), int(y_max.value)])
+                    # Dynamically adjust type and range based on the scale type toggle
+                    if scale_type.value == 'log':
+                        import math
+                        # Plotly logs require the log10 value of the boundaries when hardcoding ranges
+                        # Also protecting against 0/negative values with max(0.001, ...)
+                        low_bound = math.log10(max(0.001, float(y_min.value)))
+                        high_bound = math.log10(max(0.001, float(y_max.value)))
+                        fig.update_yaxes(type='log', range=[low_bound, high_bound])
+                    else:
+                        fig.update_yaxes(type='linear', range=[int(y_min.value), int(y_max.value)])
                 except Exception:
                     pass
+                
                 live_plot.update()
-
                 await asyncio.sleep(0.05)
 
         def send_current_phase():
