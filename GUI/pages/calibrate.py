@@ -1,3 +1,9 @@
+'''
+Purpose: the calibration page is used to remove any persistent phase
+offset induced on each channel due to mismatched electrical lengths
+Author: Kobe Prior
+Last Edited: July 17 2026
+'''
 import numpy as np
 from nicegui import APIRouter, ui
 import state

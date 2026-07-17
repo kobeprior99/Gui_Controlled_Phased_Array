@@ -1,5 +1,8 @@
 '''
-this and that
+Purpose: Run a scattering experiment to compare the scattering due to
+incident structured waveforms to compare to plane wave illumination
+Author: Kobe Prior
+Last Modified: July 17, 2026
 '''
 # pages/scattering.py
 from nicegui import APIRouter, ui

@@ -1,7 +1,11 @@
 '''
-TODO
+Purpose: This is the beam steering demonstration page that
+allows you to experiment with an electronically steered
+phased array in transmit and received mode.
+
+Author: Kobe Prior
+Last Edited: July 17 2026
 '''
-# pages/beam.py
 import asyncio
 import time
 import numpy as np

@@ -1,5 +1,7 @@
 '''
-Contains helper functions for main.py
+Purpose: Contains helper functions for main.py
+Author: Kobe Prior
+Last Modified: July 17, 2026
 '''
 import asyncio
 import json

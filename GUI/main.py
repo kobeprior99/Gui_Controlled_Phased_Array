@@ -1,3 +1,8 @@
+'''
+Purpose: this is the entry point into the graphical user interface that host pages shown @pages
+Author: Kobe Prior
+Last Modified: July 17, 2026
+'''
 import asyncio
 import serial.tools.list_ports
 from nicegui import ui, app

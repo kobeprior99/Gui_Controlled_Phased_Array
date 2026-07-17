@@ -1,3 +1,8 @@
+'''
+Purpose: This mode allows you to manually control the phase of each port for experimentation
+Author: Kobe Prior
+Last Modified: July 17, 2026
+'''
 import numpy as np
 from nicegui import APIRouter, ui
 import helpers
