@@ -5,6 +5,7 @@ Last Modified: July 17, 2026
 '''
 import asyncio
 import json
+import os
 import numpy as np
 import serial
 from nicegui import ui
@@ -56,21 +57,41 @@ def update_phase_inputs():
             field.value = val
 
 def save_calibration(filename: str):
+    # Define the target directory
+    directory = "Phase_Corrections"
+    
+    # Create the directory if it doesn't exist yet
+    os.makedirs(directory, exist_ok=True)
+    
+    # Safeguard: ensure we append .json correctly and build the full path
+    if not filename.endswith('.json'):
+        filename = f"{filename}.json"
+    filepath = os.path.join(directory, filename)
+    
     rounded_offsets = (np.round(state.PHASE_OFFSETS / state.PHASE_STEP) * state.PHASE_STEP).tolist()
-    with open(f'{filename}.json', 'w') as f:
+    
+    with open(filepath, 'w') as f:
         json.dump(rounded_offsets, f)
-    ui.notify(f'Calibration saved successfully into {filename}.json!')
+    
+    ui.notify(f'Calibration saved successfully into {filepath}!')
+
 
 def use_calibration_file(filename: str):
+    # Define the target directory
+    directory = "Phase_Corrections"
+    # Safeguard: ensure we append .json correctly and build the full path
+    if not filename.endswith('.json'):
+        filename = f"{filename}.json"
+    filepath = os.path.join(directory, filename)
     try:
-        with open(f'{filename}.json', 'r') as f:
+        with open(filepath, 'r') as f:
             loaded_offsets = json.load(f)
         state.PHASE_OFFSETS = np.round(np.array(loaded_offsets) / state.PHASE_STEP) * state.PHASE_STEP
         state.PHASE_CORRECTED = True
         update_phase_inputs()
-        ui.notify(f'Calibration file: {filename}.json loaded and applied!')
+        ui.notify(f'Calibration file: {filename} loaded and applied!')
     except FileNotFoundError:
-        ui.notify(f"No calibration file: {filename}.json found")
+        ui.notify(f"No calibration file: {filename} found in {directory}/")
 
 def gen_Cal_from_S2P() -> None:
     phases = get_phase_at_freq()
