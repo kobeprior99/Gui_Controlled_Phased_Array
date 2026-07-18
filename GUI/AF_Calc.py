@@ -69,8 +69,6 @@ def get_phase_shifts(beta_x: float, beta_y: float)->np.ndarray:
     return phases.flatten()
 
 
-
-
 def dispAF(dx: float, dy: float, beta_x: float, beta_y: float, disp:bool):
     '''
     Plots the array factor for a default square array defined in config file 
