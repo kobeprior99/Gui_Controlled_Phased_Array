@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.interpolate import RegularGridInterpolator
@@ -134,9 +135,10 @@ CORNER_HG11 = np.array([
     [-0.07, -0.21,  0.03,  0.20, -0.08, -0.30],
 ])
 
-# ── Styling constants ──────────────────────────────────────────────────────────
-BG     = '#0d1117'
-TICK_C = '#aabbcc'
+# ── Light Mode Styling Constants ───────────────────────────────────────────────
+BG     = '#ffffff'
+TEXT_C = '#1a1a1a'
+AXIS_C = '#333333'
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -156,27 +158,10 @@ def plot_scatter_diff(
     Plot the back-scattered power difference  (candidate − reference)  as a
     2-D interpolated heat-map over (theta, psi).
 
-    Parameters
-    ----------
-    reference       : 2-D array  shape (len(theta), len(psi))  — reference mode
-    candidate       : 2-D array  same shape                    — candidate mode
-    scatterer_name  : human-readable scatterer label, e.g. 'Plate'
-    reference_label : TeX label for the reference mode (default LG₀⁰)
-    candidate_label : TeX label for the candidate mode (default LG₀¹)
-    theta           : incidence-angle grid points (deg)
-    psi             : tilt/rotation-angle grid points (deg)
-    save            : write PNG to disk when True
-    fname           : output filename; auto-generated when None
-    dpi             : raster resolution
-
-    Returns
-    -------
-    fig, ax  — matplotlib objects for further customisation if needed
-
     Color convention
     ----------------
-    Green  →  candidate stronger  (positive difference)
-    Red    →  reference stronger  (negative difference)
+    Red    →  candidate stronger  (positive difference)
+    Green  →  reference stronger  (negative difference)
     """
     diff = candidate - reference
 
@@ -191,13 +176,14 @@ def plot_scatter_diff(
 
     clim = max(np.abs(Z).max(), 0.5)
 
-    # ── Figure / axes ──────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(11, 6.5), facecolor=BG)
+    # ── Figure / axes (Light mode + standard figure size for larger fonts) ─────
+    fig, ax = plt.subplots(figsize=(11, 7), facecolor=BG)
     ax.set_facecolor(BG)
 
+    # Reversed RdYlGn palette: Green = negative (reference), Red = positive (candidate)
     im = ax.pcolormesh(
         theta_fine, psi_fine, Z.T,
-        cmap='RdYlGn', vmin=-clim, vmax=clim, shading='auto',
+        cmap='RdYlGn_r', vmin=-clim, vmax=clim, shading='auto',
     )
 
     # Zero-crossing contour
@@ -205,39 +191,39 @@ def plot_scatter_diff(
         theta_fine, psi_fine, Z.T,
         levels=[0], colors='black', linewidths=2.2, linestyles='--',
     )
-    ax.clabel(cs, fmt='zero', fontsize=9, colors='black',
+    ax.clabel(cs, fmt='zero', fontsize=11, colors='black',
               inline=True, inline_spacing=6)
 
     # Data-point labels
     for i, th in enumerate(theta):
         for j, ps in enumerate(psi):
             val = diff[i, j]
-            # nudge labels inward at the right boundary
             if th == theta.max():
                 x_off, ha = -2.0, 'right'
             else:
                 x_off, ha = 1.8,  'left'
-            ax.plot(th, ps, 'x', color='black', markersize=5, zorder=5)
+            ax.plot(th, ps, 'x', color='black', markersize=6, zorder=5, markeredgewidth=1.8)
             ax.text(
                 th + x_off, ps, f'{val:+.2f} dB',
                 ha=ha, va='center',
-                fontsize=8, color='black', fontweight='bold',
-                bbox=dict(boxstyle='round,pad=0.15',
-                          facecolor='white', alpha=0.55, edgecolor='none'),
+                fontsize=10, color='black', fontweight='bold',
+                bbox=dict(boxstyle='round,pad=0.2',
+                          facecolor='white', alpha=0.85, edgecolor='#cccccc', linewidth=0.8),
             )
 
-    # ── Labels / ticks ─────────────────────────────────────────────────────────
+    # ── Labels / ticks (Increased fonts) ───────────────────────────────────────
     ax.set_title(
         f'{scatterer_name}  —  {candidate_label} − {reference_label}  '
         f'Back-Scattered Power Difference (dB)\n'
-        f'Green → {candidate_label} stronger   |   Red → {reference_label} stronger',
-        color='white', fontsize=13, fontweight='bold', pad=12,
+        f'Red → {candidate_label} stronger   |   Green → {reference_label} stronger',
+        color=TEXT_C, fontsize=16, fontweight='bold', pad=14,
     )
-    ax.set_xlabel('θ  (deg)', color=TICK_C, fontsize=13)
-    ax.set_ylabel('ψ  (deg)', color=TICK_C, fontsize=13)
-    ax.tick_params(colors=TICK_C, labelsize=11)
+    ax.set_xlabel('θ  (deg)', color=TEXT_C, fontsize=15, labelpad=8)
+    ax.set_ylabel('ψ  (deg)', color=TEXT_C, fontsize=15, labelpad=8)
+    ax.tick_params(colors=AXIS_C, labelsize=13)
     for spine in ax.spines.values():
-        spine.set_edgecolor('#223344')
+        spine.set_edgecolor(AXIS_C)
+        spine.set_linewidth(1.2)
 
     ax.set_xlim(theta.min(), theta.max())
     ax.set_ylim(psi.min(),   psi.max())
@@ -245,11 +231,11 @@ def plot_scatter_diff(
     ax.set_yticks(psi)
 
     cbar = fig.colorbar(im, ax=ax, pad=0.02)
-    cbar.ax.yaxis.set_tick_params(color=TICK_C, labelsize=10)
-    plt.setp(cbar.ax.yaxis.get_ticklabels(), color=TICK_C)
+    cbar.ax.yaxis.set_tick_params(color=AXIS_C, labelsize=12)
+    plt.setp(cbar.ax.yaxis.get_ticklabels(), color=TEXT_C)
     cbar.set_label(
         f'Δ dB  ({candidate_label} − {reference_label})',
-        color=TICK_C, fontsize=11,
+        color=TEXT_C, fontsize=14, labelpad=10
     )
 
     plt.tight_layout(pad=2.0)
@@ -261,6 +247,12 @@ def plot_scatter_diff(
             cand_short = candidate_label.replace('$', '').replace('^', '').replace('{', '').replace('}', '').replace('\\', '')
             ref_short  = reference_label.replace('$', '').replace('^', '').replace('{', '').replace('}', '').replace('\\', '')
             fname = f'scatter-dif-plots/scatter_diff_{safe_name}_{cand_short}_vs_{ref_short}.png'
+
+        # Ensure directory path exists
+        dirname = os.path.dirname(fname)
+        if dirname:
+            os.makedirs(dirname, exist_ok=True)
+
         plt.savefig(fname, dpi=dpi, bbox_inches='tight',
                     facecolor=fig.get_facecolor())
         print(f"Saved → {fname}")
@@ -273,7 +265,7 @@ def plot_scatter_diff(
 # ══════════════════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
 
-    # Plate: LG01 vs LG00  (your updated tables)
+    # Plate
     plot_scatter_diff(
         reference      = PLATE_LG00,
         candidate      = PLATE_LG01,
@@ -306,7 +298,7 @@ if __name__ == '__main__':
         candidate_label= r'HG$_{11}$',
     )
 
-
+    # Ellipsoid
     plot_scatter_diff(
         reference      = ELLIPSOID_LG00,
         candidate      = ELLIPSOID_LG01,
@@ -339,6 +331,7 @@ if __name__ == '__main__':
         candidate_label= r'HG$_{11}$',
     )
 
+    # Corner Reflector
     plot_scatter_diff(
         reference      = CORNER_LG00,
         candidate      = CORNER_LG01,
@@ -370,4 +363,5 @@ if __name__ == '__main__':
         reference_label= r'LG$_0^0$',
         candidate_label= r'HG$_{11}$',
     )
+
     plt.show()
