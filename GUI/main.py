@@ -7,7 +7,7 @@ import asyncio
 import signal
 import atexit
 import serial.tools.list_ports
-from nicegui import ui, app
+from nicegui import ui, app,background_tasks
 
 import state
 import helpers
@@ -58,7 +58,7 @@ def main_page():
     com_input = ui.select(
         options=portsList, 
         label=state.SELECTED_COM_PORT,
-        on_change=lambda e: asyncio.create_task(helpers.set_com_port(e.value))
+        on_change=lambda e: background_tasks.create(helpers.set_com_port(e.value))
     ).style('width: 300px')
 
     images = [

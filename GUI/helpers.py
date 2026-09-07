@@ -14,6 +14,7 @@ import state
 from config import BAUDRATE
 from READ_S2P import get_phase_at_freq
 from PLUTO import stop_tx
+
 def uart_self_test(timeout: float = 1.0) ->bool:
     if state.ser is None:
         return False
@@ -30,7 +31,6 @@ def uart_self_test(timeout: float = 1.0) ->bool:
 async def set_com_port(port: str):
     state.SELECTED_COM_PORT = port
     try:
-        # Note: serial is synchronous, but we handle the sleep asynchronously
         state.ser = serial.Serial(
             state.SELECTED_COM_PORT, 
             BAUDRATE, 
@@ -40,11 +40,11 @@ async def set_com_port(port: str):
             timeout=1
         )
         await asyncio.sleep(3)  # Allow Arduino to reset
-
         if uart_self_test():
-            ui.notify(f'UART link verified on {port}', color="green")
+            print(f'UART link verified on {port}')
         else:
-            ui.notify(f'No ACK from MCU on {port} - check wiring/reset', color = 'red')
+            print(f'No ACK from MCU on {port} - check wiring/reset')
+
     except Exception as e:
         print(f'Failed to open serial port: {e}')
 

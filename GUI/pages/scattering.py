@@ -191,9 +191,10 @@ def scattering():
     ui.label('OAM Modes').classes('text-xl font-bold text-center mt-4')
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in oam_images:
+            # Pass async function directly to .on('click', ...) without asyncio.create_task
             img = ui.image(f'media/{filename}')\
                 .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda _, t=target: asyncio.create_task(select_oam_image(t)))
+                .on('click', lambda _, t=target: select_oam_image(t))
             image_elements[target] = img
 
     ui.label('Hermite Modes').classes('text-xl font-bold text-center mt-4')
@@ -201,13 +202,13 @@ def scattering():
         for target, filename in hermite_images:
             img = ui.image(f'media/{filename}')\
                 .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda _, t=target: asyncio.create_task(select_hermite_image(t)))
+                .on('click', lambda _, t=target: select_hermite_image(t))
             image_elements[target] = img
 
     # ---- Noise Measurement (dBFS) ----
     ui.label('Noise Measurement').classes('text-2xl font-bold text-center mt-6')
     ui.label(f'Press the button below to transmit, wait {SETTLE_TIME_S}s for the tone to settle, '
-              f'then average {N_AVG_BUFFERS} receive buffers to report the noise/coupling level in dBFS.')\
+             f'then average {N_AVG_BUFFERS} receive buffers to report the noise/coupling level in dBFS.')\
         .classes('text-base text-gray-600 text-center')
 
     noise_label = ui.label('').classes('text-xl font-bold text-center mt-2')
@@ -236,7 +237,7 @@ def scattering():
     # ---- Backscattered Power Measurement ----
     ui.label('Backscattered Power Measurement').classes('text-2xl font-bold text-center mt-6')
     ui.label(f'Press the button below to transmit, wait {SETTLE_TIME_S}s for the tone to settle, '
-              f'then average {N_AVG_BUFFERS} receive buffers to report the backscattered power above the noise floor.')\
+             f'then average {N_AVG_BUFFERS} receive buffers to report the backscattered power above the noise floor.')\
         .classes('text-base text-gray-600 text-center')
     
     tx_dbfs_label = ui.label('').classes('text-xl font-bold text-center mt-2')
