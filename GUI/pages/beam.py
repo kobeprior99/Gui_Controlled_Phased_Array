@@ -221,6 +221,7 @@ def receive_mode():
 
         async def scan_task():
             tx()
+            await asyncio.sleep(1.0)  # 1-second delay for Tx power/local oscillator stabilization
             n_steps = len(DEFAULT_RX_GRID)
             energies = np.zeros(n_steps)
 
