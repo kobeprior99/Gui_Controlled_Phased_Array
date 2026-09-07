@@ -9,15 +9,11 @@ import asyncio
 from nicegui import APIRouter, ui
 import state
 import helpers
-from config import OAM_PHASES, RX_GAIN, TX_GAIN
+from config import OAM_PHASES, RX_GAIN, TX_GAIN, SETTLE_TIME_S, N_DISCARD_BUFFERS, N_AVG_BUFFERS
 from PLUTO import tx, stop_tx, discard_buffer, get_dBFS, set_gain
 import numpy as np
 
 router = APIRouter()
-
-SETTLE_TIME_S = 3
-N_DISCARD_BUFFERS = 100
-N_AVG_BUFFERS = 30
 
 
 async def measure_avg_dbfs() -> float:
@@ -33,16 +29,21 @@ async def measure_avg_dbfs() -> float:
     return float(np.mean(readings))
 
 
-def oam_mode(mode: str):
+async def oam_mode(mode: str, phase_confirmed: dict):
     phases = OAM_PHASES * int(mode)
-    try: 
-        helpers.send_phases(phases)
+    try:
+        confirmed = await asyncio.to_thread(helpers.send_phases, phases, True)
     except Exception as e:
+        confirmed = False
         ui.notify(f'Failed to send phases: {e}', color='red')
+    phase_confirmed['value'] = confirmed
+    if confirmed:
+        ui.notify('Successfully sent phases', type='positive')
     else:
-        ui.notify('Successfully sent phases')
+        ui.notify('Phases sent but not confirmed by MCU!', color='red')
 
-def hermite_mode(mode: str):
+
+async def hermite_mode(mode: str, phase_confirmed: dict):
     if mode == '01':
         phases = np.array([
             0,0,0,0,0,0,0,0,180,180,180,180,180,180,180,180
@@ -54,14 +55,18 @@ def hermite_mode(mode: str):
     else:
         phases = np.array([
             0,0,180,180,0,0,180,180,180,180,0,0,180,180,0,0
-        ]) 
+        ])
 
-    try: 
-        helpers.send_phases(phases)
+    try:
+        confirmed = await asyncio.to_thread(helpers.send_phases, phases, True)
     except Exception as e:
+        confirmed = False
         ui.notify(f'Failed to send phases: {e}', color='red')
+    phase_confirmed['value'] = confirmed
+    if confirmed:
+        ui.notify('Successfully sent phases', type='positive')
     else:
-        ui.notify('Successfully sent phases')
+        ui.notify('Phases sent but not confirmed by MCU!', color='red')
 
 
 @router.page('/scattering')
@@ -71,6 +76,9 @@ def scattering():
     # ---- Busy state (locks controls while a measurement is in flight) ----
     busy = {'value': False}
     lockable_elements = []  # sliders/buttons with .disable()/.enable()
+
+    # ---- Phase confirmation state (locks measurements if last send unconfirmed) ----
+    phase_confirmed = {'value': True}  # True until a send fails to confirm
 
     def set_busy(is_busy: bool):
         busy['value'] = is_busy
@@ -84,6 +92,13 @@ def scattering():
             return True
         return False
 
+    def guard_unconfirmed() -> bool:
+        '''Returns True (and notifies) if the last phase send wasn't confirmed by the MCU.'''
+        if not phase_confirmed['value']:
+            ui.notify('Last phase update was not confirmed by the MCU — reselect a mode before measuring', color='red')
+            return True
+        return False
+
     with ui.column().classes('w-full items-center gap-6 mt-6'):
         ui.label('Scattering Mode Selection').classes('text-2xl font-bold text-center')
         ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
@@ -92,7 +107,7 @@ def scattering():
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
 
-# ---- SDR Gain Controls ----
+    # ---- SDR Gain Controls ----
     ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')
 
     def update_rx_gain(e):
@@ -155,30 +170,30 @@ def scattering():
 
     image_elements = {}
 
-    def select_oam_image(t):
+    async def select_oam_image(t):
         if guard_busy():
             return
         if state.selected is not None and state.selected in image_elements:
             image_elements[state.selected].classes(remove='ring-4 ring-red-500')
         image_elements[t].classes('ring-4 ring-red-500')
         state.selected = t
-        oam_mode(t)
+        await oam_mode(t, phase_confirmed)
 
-    def select_hermite_image(t):
+    async def select_hermite_image(t):
         if guard_busy():
             return
         if state.selected is not None and state.selected in image_elements:
             image_elements[state.selected].classes(remove='ring-4 ring-red-500')
         image_elements[t].classes('ring-4 ring-red-500')
         state.selected = t
-        hermite_mode(t)
+        await hermite_mode(t, phase_confirmed)
 
     ui.label('OAM Modes').classes('text-xl font-bold text-center mt-4')
     with ui.row().classes('w-full justify-center items-center gap-4'):
         for target, filename in oam_images:
             img = ui.image(f'media/{filename}')\
                 .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda _, t=target: select_oam_image(t))
+                .on('click', lambda _, t=target: asyncio.create_task(select_oam_image(t)))
             image_elements[target] = img
 
     ui.label('Hermite Modes').classes('text-xl font-bold text-center mt-4')
@@ -186,7 +201,7 @@ def scattering():
         for target, filename in hermite_images:
             img = ui.image(f'media/{filename}')\
                 .classes('w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200') \
-                .on('click', lambda _, t=target: select_hermite_image(t))
+                .on('click', lambda _, t=target: asyncio.create_task(select_hermite_image(t)))
             image_elements[target] = img
 
     # ---- Noise Measurement (dBFS) ----
@@ -199,7 +214,7 @@ def scattering():
     noise_dbfs_value = {'value': None}
 
     async def record_noise_and_coupling_dbfs():
-        if guard_busy():
+        if guard_busy() or guard_unconfirmed():
             return
         set_busy(True)
         try:
@@ -227,7 +242,7 @@ def scattering():
     tx_dbfs_label = ui.label('').classes('text-xl font-bold text-center mt-2')
     
     async def record_tx_dbfs():
-        if guard_busy():
+        if guard_busy() or guard_unconfirmed():
             return
         if noise_dbfs_value['value'] is None:
             ui.notify('Please record the noise floor first!', type='warning')

@@ -29,7 +29,7 @@ PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
 BASE_BAND = 100e3
 SAMP_RATE = 5e6  # Hz e.g. 5 MHz
 TX_GAIN = -7 # -7 is -7dBm measured with spectrum analyzer and about 10 dBm with the inline amplifier.RX_GAIN = 5 # adjust as needed 0-74 be careful you don't wanna blow out frent end
-
+RX_GAIN = 0# 
 #4 ms to fill buffer
 BUFFER_SIZE = 4*2048 
 NUM_AVG = 1
@@ -44,3 +44,9 @@ OAM_PHASES = np.array([
 
 #calibration directory
 S2PDIR = 'S2P_JUNE_12'
+
+
+#Scattering test
+SETTLE_TIME_S = 3
+N_DISCARD_BUFFERS = 100
+N_AVG_BUFFERS = 30

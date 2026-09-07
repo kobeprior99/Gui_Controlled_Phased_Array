@@ -14,6 +14,18 @@ import state
 from config import BAUDRATE
 from READ_S2P import get_phase_at_freq
 from PLUTO import stop_tx
+def uart_self_test(timeout: float = 1.0) ->bool:
+    if state.ser is None:
+        return False
+    test_pattern = np.zeros(16, dtype=np.uint8)
+    state.ser.reset_input_buffer()
+    state.ser.reset_output_buffer()
+    state.ser.write(test_pattern.tobytes())
+    old_timeout = state.ser.timeout
+    state.ser.timeout = timeout
+    ack = state.ser.read(1)
+    state.ser.timeout = old_timeout
+    return ack == b'\xaa'
 
 async def set_com_port(port: str):
     state.SELECTED_COM_PORT = port
@@ -27,20 +39,40 @@ async def set_com_port(port: str):
             stopbits=serial.STOPBITS_ONE, 
             timeout=1
         )
-        state.ser.dtr = True
-        state.ser.rts = True
         await asyncio.sleep(3)  # Allow Arduino to reset
+
+        if uart_self_test():
+            ui.notify(f'UART link verified on {port}', color="green")
+        else:
+            ui.notify(f'No ACK from MCU on {port} - check wiring/reset', color = 'red')
     except Exception as e:
         print(f'Failed to open serial port: {e}')
 
-def send_phases(phases: np.ndarray):
+def send_phases(phases: np.ndarray, safe: bool = False, ack_timeout: float = 0.5) -> bool | None:
     if state.ser is None:
         raise ConnectionError("Serial port is not connected.")
-    
+
     total_phase = (phases + state.PHASE_OFFSETS)
     normalized_phase = total_phase % 360
     hardware_phases = np.uint8(np.round(normalized_phase * (256 / 360)))
+
+    if safe:
+        state.ser.reset_input_buffer()  # drop any stale bytes before we send
+
     state.ser.write(hardware_phases.tobytes())
+
+    if not safe:
+        return None  # fire-and-forget, no round trip cost
+
+    old_timeout = state.ser.timeout
+    state.ser.timeout = ack_timeout
+    ack = state.ser.read(1)
+    state.ser.timeout = old_timeout
+
+    if ack != b'\xaa':
+        print(f"WARNING: no ACK for phase update (got {ack!r})")
+        return False
+    return True
 
 def update_phase(index: int, value: float):
     if value is None or value == '':
