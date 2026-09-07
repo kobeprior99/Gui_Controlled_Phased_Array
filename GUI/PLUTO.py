@@ -9,37 +9,64 @@ sdr = None
 # --- Connect to PlutoSDR ---
 try:
     sdr = adi.Pluto("ip:192.168.2.1")
-    sdr.sample_rate = int(SAMP_RATE)
+
+    # Mute TX hardware gain on startup to prevent calibration RF bursts
+    sdr.tx_hardwaregain_chan0 = -80.0
+
+    # Force DDS tone scales to 0 immediately upon startup
+    sdr.dds_single_tone(0, 0, 0)
 
     # --- TX setup ---
-    sdr.tx_rf_bandwidth = int(SAMP_RATE)      # Match baseband BW
-    sdr.tx_lo = int(FREQ)                     # RF carrier in Hz
-    sdr.tx_hardwaregain_chan0 = TX_GAIN       # dB
+    sdr.sample_rate = int(SAMP_RATE)
+    sdr.tx_rf_bandwidth = int(SAMP_RATE)
+    sdr.tx_lo = int(FREQ)
 
     # --- RX setup ---
-    sdr.rx_lo = int(FREQ)                     # RF carrier in Hz
+    sdr.rx_lo = int(FREQ)
     sdr.rx_rf_bandwidth = int(SAMP_RATE)
     sdr.gain_control_mode_chan0 = "manual"
-    sdr.rx_hardwaregain_chan0 = RX_GAIN       # Adjust as needed
+    sdr.rx_hardwaregain_chan0 = float(RX_GAIN)
     sdr.rx_buffer_size = BUFFER_SIZE
 
 except Exception as e:
     print(f"Error connecting to PLUTO: {e}")
 
 
+def set_gain(rx_gain: float = None, tx_gain: float = None):
+    """
+    Update RX and/or TX hardware gain settings on the SDR.
+    """
+    global sdr, TX_GAIN
+    if sdr is None:
+        print("SDR instance is not connected.")
+        return
+
+    if rx_gain is not None:
+        sdr.gain_control_mode_chan0 = "manual"
+        sdr.rx_hardwaregain_chan0 = float(rx_gain)
+
+    if tx_gain is not None:
+        TX_GAIN = float(tx_gain)
+        # Only apply live to hardware if transmission is active
+        if TX_ACTIVE:
+            sdr.tx_hardwaregain_chan0 = TX_GAIN
+
+
 def tx():
-    '''Enable hardware DDS tone generation (0.9 scale prevents clipping)'''
-    global TX_ACTIVE
+    '''Enable hardware DDS tone generation and restore TX gain'''
+    global TX_ACTIVE, TX_GAIN
     if sdr is not None:
+        sdr.tx_hardwaregain_chan0 = float(TX_GAIN)
         sdr.dds_single_tone(int(BASE_BAND), 0.9, 0)
         TX_ACTIVE = True
 
 
 def stop_tx():
-    '''Disable hardware DDS tone generation'''
+    '''Disable hardware DDS tone generation and mute carrier feedthrough'''
     global TX_ACTIVE
-    if TX_ACTIVE and sdr is not None:
+    if sdr is not None:
         sdr.dds_single_tone(0, 0, 0)
+        sdr.tx_hardwaregain_chan0 = -80.0  # Drop LO leakage into noise floor
         TX_ACTIVE = False
 
 

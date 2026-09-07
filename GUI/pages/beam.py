@@ -15,9 +15,9 @@ from nicegui import APIRouter, ui
 
 import state
 import helpers
-from config import DX, DY, THETA_RANGE, PHI_RANGE
+from config import DX, DY, THETA_RANGE, PHI_RANGE, RX_GAIN, TX_GAIN
 from AF_Calc import runAF_Calc
-from PLUTO import get_energy, tx, stop_tx, discard_buffer
+from PLUTO import get_energy, tx, stop_tx, discard_buffer, set_gain
 from create_default_rx_grid import DEFAULT_RX_GRID
 
 router = APIRouter()
@@ -33,6 +33,46 @@ def beam_page():
 
     with ui.row().classes('w-full justify-center items-center'):
         ui.image('media/Beam_Explanation.png')
+
+
+def add_tx_gain_slider():
+    '''Adds a TX gain slider + live label, no notifications on change.'''
+    def update_tx_gain(e):
+        try:
+            set_gain(tx_gain=e.value)
+        except Exception as err:
+            ui.notify(f'Failed to set TX gain: {err}', color='red')
+
+    with ui.card().classes('w-full max-w-2xl mx-auto p-4 mt-2'):
+        with ui.row().classes('w-full items-center justify-between'):
+            ui.label('TX Gain (dB):').classes('font-semibold text-lg')
+            tx_label = ui.label(f'{TX_GAIN:.1f} dB').classes('font-mono text-lg')
+
+        tx_slider = ui.slider(
+            min=-89.75, max=0.0, step=0.25, value=TX_GAIN,
+            on_change=update_tx_gain
+        ).classes('w-full')
+        tx_slider.bind_value_to(tx_label, 'text', forward=lambda v: f'{v:.1f} dB')
+
+
+def add_rx_gain_slider():
+    '''Adds an RX gain slider + live label, no notifications on change.'''
+    def update_rx_gain(e):
+        try:
+            set_gain(rx_gain=e.value)
+        except Exception as err:
+            ui.notify(f'Failed to set RX gain: {err}', color='red')
+
+    with ui.card().classes('w-full max-w-2xl mx-auto p-4 mt-2'):
+        with ui.row().classes('w-full items-center justify-between'):
+            ui.label('RX Gain (dB):').classes('font-semibold text-lg')
+            rx_label = ui.label(f'{RX_GAIN:.1f} dB').classes('font-mono text-lg')
+
+        rx_slider = ui.slider(
+            min=-1, max=73, step=1, value=RX_GAIN,
+            on_change=update_rx_gain
+        ).classes('w-full')
+        rx_slider.bind_value_to(rx_label, 'text', forward=lambda v: f'{v:.1f} dB')
 
 
 # ---- Transmit Mode Subpage ----
@@ -54,14 +94,18 @@ def transmit_mode():
             dy = ui.number(label='dy (λ)', value=DY, min=0.1).style('width:20%')
             theta = ui.number(label='Theta (deg)', value=0, min=0, max=90).style('width:20%')
             phi = ui.number(label='Phi (deg)', value=0, min=0, max=360).style('width:20%')
-             
+
         with ui.row().classes('w-full justify-center items-center'):
-            y_min = ui.number(label='Set Minimum Power for Graph', value=0, min=1).style('width:30%') 
+            y_min = ui.number(label='Set Minimum Power for Graph', value=0, min=1).style('width:30%')
             y_max = ui.number(label='Set Maximum Power for Graph', value=10, min=1).style('width:30%')
 
         # Added a toggle switch to let the user select between Linear and Logarithmic scales
         with ui.row().classes('w-full justify-center items-center m-2'):
             scale_type = ui.toggle({'linear': 'Linear', 'log': 'Logarithmic'}, value='linear')
+
+        # ---- SDR Gain Controls ----
+        ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')
+        add_tx_gain_slider()
 
         fig = go.Figure(go.Scatter(x=[], y=[], mode='lines', name='Received Energy'))
         fig.update_layout(
@@ -72,7 +116,7 @@ def transmit_mode():
         live_plot = ui.plotly(fig).classes('w-3/4 h-64')
         image_container = ui.row().classes('justify-center items-center').style('order:2; width:90%;')
         stop_event = asyncio.Event()
-        
+
         def start_live_plot():
             phases = runAF_Calc(dx.value, dy.value, theta.value, phi.value)
             helpers.send_phases(phases)
@@ -81,7 +125,7 @@ def transmit_mode():
             with image_container:
                 ui.image('media/AF.png').style('width:40%;').force_reload()
                 ui.image('media/uv.png').style('width:40%;').force_reload()
-            
+
             tx()
             stop_event.clear()
             asyncio.create_task(live_update())
@@ -100,10 +144,10 @@ def transmit_mode():
                 energy_values.append(energy)
                 t_values = t_values[-100:]
                 energy_values = energy_values[-100:]
-                
+
                 fig.data[0].x = t_values
                 fig.data[0].y = energy_values
-                
+
                 try:
                     # Dynamically adjust type and range based on the scale type toggle
                     if scale_type.value == 'log':
@@ -117,7 +161,7 @@ def transmit_mode():
                         fig.update_yaxes(type='linear', range=[int(y_min.value), int(y_max.value)])
                 except Exception:
                     pass
-                
+
                 live_plot.update()
                 await asyncio.sleep(0.05)
 
@@ -145,7 +189,7 @@ def transmit_mode():
 
 # ---- Receive Mode Subpage ----
 @router.page('/receive_mode')
-def receive_mode():        
+def receive_mode():
     ui.button('⬅ Back', on_click=helpers.nav_back)
     with ui.column().classes('w-full'):
         ui.label('Receive mode').classes('text-2xl font-bold text-center')
@@ -156,13 +200,17 @@ def receive_mode():
         with ui.row().classes('w-full justify-center items-center'):
             ui.image('media/Default_Array.png').style('width: 45%;')
             ui.image('media/Default_Array2.png').style('width: 45%;')
-        with ui.row().classes('w-full justify-center items-center'): 
+        with ui.row().classes('w-full justify-center items-center'):
             ui.label('Place the transmitting antenna somewhere within line of sight of the receiving array, then press start when you are ready to scan')\
                 .classes('text-base text-gray-600 text-center')
-        with ui.row().classes('w-full justify-center items-center'): 
+        with ui.row().classes('w-full justify-center items-center'):
             ui.label('The coefficients are precomputed for the default array')\
                 .classes('text-base text-gray-600 text-center')
-    
+
+        # ---- SDR Gain Controls ----
+        ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')
+        add_rx_gain_slider()
+
     image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
 
     def Scan_Beam():
@@ -228,6 +276,6 @@ def receive_mode():
 
             dialog.close()
 
-        asyncio.create_task(scan_task()) 
+        asyncio.create_task(scan_task())
 
     ui.button('Start', on_click=Scan_Beam)

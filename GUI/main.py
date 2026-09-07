@@ -1,14 +1,17 @@
 '''
 Purpose: this is the entry point into the graphical user interface that host pages shown @pages
 Author: Kobe Prior
-Last Modified: July 17, 2026
+Last Modified: September 7, 2026
 '''
 import asyncio
+import signal
+import atexit
 import serial.tools.list_ports
 from nicegui import ui, app
 
 import state
 import helpers
+from PLUTO import stop_tx  # Import stop_tx from your SDR module
 
 # Import all routers from the pages module
 from pages import (
@@ -24,6 +27,29 @@ app.include_router(manual_router)
 app.include_router(beam_router)
 app.include_router(scattering_router)
 
+# --- Shutdown & Clean-Up Handlers ---
+def cleanup():
+    """Safety function to disable transmitter upon exit."""
+    try:
+        stop_tx()
+        print("\n[INFO] Transmitter successfully disabled.")
+    except Exception as e:
+        print(f"\n[ERROR] Failed to stop transmitter during shutdown: {e}")
+
+# 1. Hook into NiceGUI's app shutdown event
+app.on_shutdown(cleanup)
+
+# 2. Register Python process exit handlers (atexit & OS signals)
+atexit.register(cleanup)
+
+def signal_handler(sig, frame):
+    cleanup()
+    exit(0)
+
+signal.signal(signal.SIGINT, signal_handler)   # Handles Ctrl+C
+signal.signal(signal.SIGTERM, signal_handler)  # Handles terminate requests
+
+# --- GUI Layout ---
 @ui.page('/')
 def main_page():
     ports = serial.tools.list_ports.comports()

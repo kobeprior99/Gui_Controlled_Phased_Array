@@ -2,14 +2,14 @@
 Purpose: Run a scattering experiment to compare the scattering due to
 incident structured waveforms to compare to plane wave illumination
 Author: Kobe Prior
-Last Modified: July 17, 2026
+Last Modified: September 7, 2026
 '''
 # pages/scattering.py
 from nicegui import APIRouter, ui
 import state
 import helpers
-from config import OAM_PHASES
-from PLUTO import tx, stop_tx, discard_buffer, get_dBFS
+from config import OAM_PHASES, RX_GAIN, TX_GAIN
+from PLUTO import tx, stop_tx, discard_buffer, get_dBFS, set_gain
 import numpy as np
 
 router = APIRouter()
@@ -55,6 +55,45 @@ def scattering():
         with ui.row().classes('w-full justify-center items-center'):
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
+
+# ---- SDR Gain Controls ----
+    ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')
+
+    def update_rx_gain(e):
+        try:
+            set_gain(rx_gain=e.value)
+        except Exception as err:
+            ui.notify(f'Failed to set RX gain: {err}', color='red')
+
+    def update_tx_gain(e):
+        try:
+            set_gain(tx_gain=e.value)
+        except Exception as err:
+            ui.notify(f'Failed to set TX gain: {err}', color='red')
+
+    with ui.card().classes('w-full max-w-2xl mx-auto p-4 mt-2'):
+        with ui.column().classes('w-full gap-4'):
+            # RX Gain Slider (-1 dB to 73 dB)
+            with ui.row().classes('w-full items-center justify-between'):
+                ui.label('RX Gain (dB):').classes('font-semibold text-lg')
+                rx_label = ui.label(f'{RX_GAIN:.1f} dB').classes('font-mono text-lg')
+
+            rx_slider = ui.slider(
+                min=-1, max=73, step=1, value=RX_GAIN,
+                on_change=update_rx_gain
+            ).classes('w-full')
+            rx_slider.bind_value_to(rx_label, 'text', forward=lambda v: f'{v:.1f} dB')
+
+            # TX Gain Slider (-89.75 dB to 0 dB)
+            with ui.row().classes('w-full items-center justify-between mt-2'):
+                ui.label('TX Gain (dB):').classes('font-semibold text-lg')
+                tx_label = ui.label(f'{TX_GAIN:.1f} dB').classes('font-mono text-lg')
+
+            tx_slider = ui.slider(
+                min=-89.75, max=0.0, step=0.25, value=TX_GAIN,
+                on_change=update_tx_gain
+            ).classes('w-full')
+            tx_slider.bind_value_to(tx_label, 'text', forward=lambda v: f'{v:.1f} dB')
 
     oam_images = [
         ('-3', 'oam--3.png'),
