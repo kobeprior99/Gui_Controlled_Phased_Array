@@ -18,7 +18,8 @@ from pages import (
     calibrate_router,
     manual_router,
     beam_router,
-    scattering_router
+    scattering_router,
+    scattering_router2
 )
 
 # Attach/Include routers
@@ -26,6 +27,7 @@ app.include_router(calibrate_router)
 app.include_router(manual_router)
 app.include_router(beam_router)
 app.include_router(scattering_router)
+app.include_router(scattering_router2)
 
 # --- Shutdown & Clean-Up Handlers ---
 def cleanup():
@@ -66,6 +68,7 @@ def main_page():
         ('/manual', 'Manual_Phase_Control.png'), 
         ('/beam', 'Beam_Control.png'),
         ('/scattering', 'Scattering_Experiment.png')
+        ('/scattering2', 'Scattering_Experiment2.jpeg')
     ]
 
     with ui.column().classes('w-full items-center'):
