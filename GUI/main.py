@@ -67,7 +67,7 @@ def main_page():
         ('/calibrate', 'Calibration.png'),
         ('/manual', 'Manual_Phase_Control.png'), 
         ('/beam', 'Beam_Control.png'),
-        ('/scattering', 'Scattering_Experiment.png')
+        ('/scattering', 'Scattering_Experiment.png'),
         ('/scattering2', 'Scattering_Experiment2.jpeg')
     ]
 

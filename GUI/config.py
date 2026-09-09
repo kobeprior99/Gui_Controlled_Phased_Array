@@ -43,7 +43,7 @@ OAM_PHASES = np.array([
     ]) 
 
 #calibration directory
-S2PDIR = 'S2P_JUNE_12'
+S2PDIR = 'S2P-SEP9-2026'
 
 
 #Scattering test
