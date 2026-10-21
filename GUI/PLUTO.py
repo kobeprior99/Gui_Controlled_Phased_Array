@@ -1,7 +1,32 @@
+'''
+PLUTO.py
+
+Interface layer for PLUTO SDR: connection and setup, TX tone generation, 
+RX gain control, and receive power
+
+dBFS convention
+---------------
+Power is mean(|s|^2) = mean(I^2 + Q^2) over complex samples, and
+    dBFS = 10 * log10(power / FULL_SCALE^2)
+FULL_SCALE is the ADC amplitude (2**11 for the Pluto's 12-bit signed samples),
+not the power, because it is squared here. A full-scale complex sample (I and Q
+both at +/-FULL_SCALE) reads +3 dBFS under this definition, since I^2 + Q^2 = 2 * FS^2.
+
+Self-test (python pluto_sdr.py)
+-------------------------------
+Enables AGC (slow_attack), transmits the DDS tone, waits for the loop to settle,
+then logs N_BUFFERS RX buffers. Prints the mean/std dBFS, offset from the -12 dBFS
+AGC target, AGC-selected RX gain, and peak sample value (to detect clipping), then
+plots dBFS and RX gain versus buffer index. TX is muted and RX gain restored to
+manual on exit.
+
+Author: Kobe Prior
+Date Last Modified October 21 2026
+'''
 import time
 import adi
 import numpy as np
-from config import FREQ, BASE_BAND, SAMP_RATE, BUFFER_SIZE, NUM_AVG, RX_GAIN, TX_GAIN
+from config import FREQ, BASE_BAND, SAMP_RATE, BUFFER_SIZE, NUM_AVG, RX_GAIN, TX_GAIN, FULL_SCALE
 
 TX_ACTIVE = False
 sdr = None
@@ -75,13 +100,18 @@ def discard_buffer():
         sdr.rx()
 
 
+def power_to_dBFS(power: float) -> float:
+    '''Convert mean power (mean of |s|^2) to dBFS relative to FULL_SCALE'''
+    return 10 * np.log10(power / FULL_SCALE**2 + 1e-20)
+
+
 def get_dBFS():
     '''
-    Finds the RMS value of the rx buffer and scales relative to full scale
+    Mean power of the rx buffer (mean of I^2 + Q^2) relative to full scale
     '''
     s = sdr.rx()
-    rms = np.sqrt(np.mean(np.abs(s)**2))
-    return 20 * np.log10(rms / 2**14)  # 12-bit signed ADC in a 16-bit container
+    power = np.mean(np.abs(s)**2)
+    return power_to_dBFS(power)
 
 
 def get_energy() -> float:
@@ -114,40 +144,61 @@ def moving_average(x, window=8):
     return np.convolve(x, np.ones(window) / window, mode='valid')
 
 
-# --- Example usage ---
+# --- Test notion of dBFS: with AGC on we should see about -12 dBFS ---
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
-    if sdr is not None:
-        DURATION = 15  # seconds
-        INTERVAL = 1   # seconds
-        n_samples = DURATION / INTERVAL
-        energies = []
+    N_BUFFERS = 200          # number of rx buffers to log
+    SETTLE_S = 1.0           # wait after enabling TX + AGC
+    AGC_TARGET_DBFS = -12.0
 
+    if sdr is None:
+        raise SystemExit("SDR not connected.")
+
+    try:
+        # AGC on (slow_attack is the usual choice for a continuous tone)
+        sdr.gain_control_mode_chan0 = "slow_attack"
+
+        # Transmit and give the AGC time to converge
         tx()
-        # Let transmit settle
-        time.sleep(0.01)
+        time.sleep(SETTLE_S)
+        for _ in range(10):      # flush stale buffers captured before AGC settled
+            discard_buffer()
 
-        start_time = time.time()
-        for i in range(int(n_samples)):
-            energy = get_energy()
-            energies.append(energy)
+        levels, gains, peaks = [], [], []
+        for _ in range(N_BUFFERS):
+            s = sdr.rx()
+            levels.append(power_to_dBFS(np.mean(np.abs(s) ** 2)))
+            peaks.append(max(np.max(np.abs(s.real)), np.max(np.abs(s.imag))))
+            gains.append(sdr.rx_hardwaregain_chan0)  # gain chosen by the AGC
 
-            # Wait until next interval tick
-            elapsed = time.time() - start_time
-            next_tick = (i + 1) * INTERVAL
-            sleep_time = next_tick - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+        levels, gains, peaks = np.array(levels), np.array(gains), np.array(peaks)
 
-        stop_tx()
-        sdr = None
+        print(f"Mean dBFS: {levels.mean():.2f}  (std {levels.std():.2f})")
+        print(f"Offset from {AGC_TARGET_DBFS:.0f} dBFS target: {levels.mean() - AGC_TARGET_DBFS:+.2f} dB")
+        print(f"AGC gain: {gains.mean():.1f} dB (min {gains.min():.1f}, max {gains.max():.1f})")
+        print(f"Peak |I| or |Q|: {peaks.max():.0f} of {FULL_SCALE - 1} (near full scale means clipping)")
 
-        times = np.arange(0, DURATION, INTERVAL)
-        plt.figure(figsize=(8, 5))
-        plt.plot(times, energies / np.max(energies), marker='o')
-        plt.xlabel('Time [s]')
-        plt.ylabel('Received energy (normalized)')
-        plt.title("Energy vs Time")
-        plt.grid(True)
+        # --- Plot ---
+        fig, ax1 = plt.subplots(figsize=(10, 5))
+        ax1.plot(levels, label="Measured dBFS")
+        ax1.axhline(AGC_TARGET_DBFS, color="k", linestyle="--", label="AGC target (-12 dBFS)")
+        ax1.set_xlabel("Buffer index")
+        ax1.set_ylabel("dBFS")
+        ax1.grid(True)
+
+        ax2 = ax1.twinx()
+        ax2.plot(gains, color="tab:red", alpha=0.5, label="AGC RX gain (dB)")
+        ax2.set_ylabel("RX hardware gain (dB)")
+
+        h1, l1 = ax1.get_legend_handles_labels()
+        h2, l2 = ax2.get_legend_handles_labels()
+        ax1.legend(h1 + h2, l1 + l2, loc="best")
+        plt.title("Pluto AGC: measured dBFS and AGC-selected gain")
+        plt.tight_layout()
         plt.show()
+
+    finally:
+        stop_tx()
+        sdr.gain_control_mode_chan0 = "manual"
+        sdr.rx_hardwaregain_chan0 = float(RX_GAIN)
