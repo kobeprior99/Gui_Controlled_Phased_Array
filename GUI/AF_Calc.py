@@ -3,9 +3,14 @@ File: AF_Calc.py
 Author: Kobe Prior
 Date: 2025-09-21
 Description:
-    Brief description of what this script/module does.
-    Include any important details or functionality.
-    
+
+This module is used to find the progressive phase shifted to apply to achieve
+beam steering in a target direction theta_0 and phi_0
+
+It then computes the appropriate phase list to be send to phase shifting network
+
+Lastly it computes the array factor and plots it in 3D and in the UV plane.
+
 Usage:
     Example of how to run or use the script/module, if applicable.
 
