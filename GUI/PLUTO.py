@@ -172,33 +172,35 @@ if __name__ == "__main__":
             peaks.append(max(np.max(np.abs(s.real)), np.max(np.abs(s.imag))))
             gains.append(sdr.rx_hardwaregain_chan0)  # gain chosen by the AGC
 
-        levels, gains, peaks = np.array(levels), np.array(gains), np.array(peaks)
-
-        print(f"Mean dBFS: {levels.mean():.2f}  (std {levels.std():.2f})")
-        print(f"Offset from {AGC_TARGET_DBFS:.0f} dBFS target: {levels.mean() - AGC_TARGET_DBFS:+.2f} dB")
-        print(f"AGC gain: {gains.mean():.1f} dB (min {gains.min():.1f}, max {gains.max():.1f})")
-        print(f"Peak |I| or |Q|: {peaks.max():.0f} of {FULL_SCALE - 1} (near full scale means clipping)")
-
-        # --- Plot ---
-        fig, ax1 = plt.subplots(figsize=(10, 5))
-        ax1.plot(levels, label="Measured dBFS")
-        ax1.axhline(AGC_TARGET_DBFS, color="k", linestyle="--", label="AGC target (-12 dBFS)")
-        ax1.set_xlabel("Buffer index")
-        ax1.set_ylabel("dBFS")
-        ax1.grid(True)
-
-        ax2 = ax1.twinx()
-        ax2.plot(gains, color="tab:red", alpha=0.5, label="AGC RX gain (dB)")
-        ax2.set_ylabel("RX hardware gain (dB)")
-
-        h1, l1 = ax1.get_legend_handles_labels()
-        h2, l2 = ax2.get_legend_handles_labels()
-        ax1.legend(h1 + h2, l1 + l2, loc="best")
-        plt.title("Pluto AGC: measured dBFS and AGC-selected gain")
-        plt.tight_layout()
-        plt.show()
 
     finally:
         stop_tx()
         sdr.gain_control_mode_chan0 = "manual"
         sdr.rx_hardwaregain_chan0 = float(RX_GAIN)
+
+    levels, gains, peaks = np.array(levels), np.array(gains), np.array(peaks)
+
+    print(f"Mean dBFS: {levels.mean():.2f}  (std {levels.std():.2f})")
+    print(f"Offset from {AGC_TARGET_DBFS:.0f} dBFS target: {levels.mean() - AGC_TARGET_DBFS:+.2f} dB")
+    print(f"AGC gain: {gains.mean():.1f} dB (min {gains.min():.1f}, max {gains.max():.1f})")
+    print(f"Peak |I| or |Q|: {peaks.max():.0f} of {FULL_SCALE - 1} (near full scale means clipping)")
+
+    # --- Plot ---
+    fig, ax1 = plt.subplots(figsize=(10, 5))
+    ax1.plot(levels, label="Measured dBFS")
+    ax1.axhline(AGC_TARGET_DBFS, color="k", linestyle="--", label="AGC target (-12 dBFS)")
+    ax1.set_xlabel("Buffer index")
+    ax1.set_ylabel("dBFS")
+    ax1.grid(True)
+
+    ax2 = ax1.twinx()
+    ax2.plot(gains, color="tab:red", alpha=0.5, label="AGC RX gain (dB)")
+    ax2.set_ylabel("RX hardware gain (dB)")
+
+    h1, l1 = ax1.get_legend_handles_labels()
+    h2, l2 = ax2.get_legend_handles_labels()
+    ax1.legend(h1 + h2, l1 + l2, loc="best")
+    plt.title("Pluto AGC: measured dBFS and AGC-selected gain")
+    plt.tight_layout()
+    plt.show()
+    del sdr
