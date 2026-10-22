@@ -8,7 +8,9 @@ import numpy as np
 from nicegui import APIRouter, ui
 import state
 import helpers
-
+from pathlib import Path
+from config import DEFAULT_CAL
+CAL_DIR = Path(__file__).resolve().parent.parent / 'Phase_Corrections'
 router = APIRouter()
 
 @router.page('/calibrate')
@@ -40,16 +42,24 @@ def calibrate():
                 ))
         dialog.open()
 
+
     def prompt_use_calibration():
+        files = sorted(p.name for p in CAL_DIR.glob('*.json'))  # adjust the extension/pattern
+
         with ui.dialog() as dialog, ui.card():
-            ui.label('Enter calibration filename:')
-            filename_input = ui.input(label='Filename')
+            ui.label('Select calibration file:')
+            file_select = ui.select(
+                options=files,
+                label='Filename',
+                with_input=True,   # lets you type to filter the list
+            ).classes('w-64')
+
             with ui.row():
                 ui.button('Cancel', on_click=dialog.close)
                 ui.button('Load', on_click=lambda: (
-                    helpers.use_calibration_file(filename_input.value.strip()),
+                    helpers.use_calibration_file(file_select.value),
                     dialog.close()
-                ))
+                ) if file_select.value else ui.notify('Pick a file first', type='warning'))
         dialog.open()
 
     with ui.row().classes('justify-center gap-4 my-2'):
