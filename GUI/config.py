@@ -9,8 +9,8 @@ NSIDE = 4
 
 #RX grid 
 #spacing in meters
-dx_m = 48.3e-3
-dy_m = 56.4e-3
+dx_m = 50e-3
+dy_m = 57.5e-3
 
 ##dx dy in wavelengths is:
 DX = dx_m/LAMBDA 
@@ -45,12 +45,18 @@ OAM_PHASES = np.array([
         -158.73, -130.58, -49.42, -21.27,
         -130.58, -105.93, -74.07, -49.42,
     ]) 
-
+#the circularly polarized array has sequentially rotated elements and we must compensate for the phase
+CP_PHASES = np.array([
+        130.58, 105.93, 74.07, 49.42,
+        158.73, 130.58, 49.42, 21.27,
+        -158.73, -130.58, -49.42, -21.27,
+        -130.58, -105.93, -74.07, -49.42,
+    ]) 
 #calibration directory
 S2PDIR = 'S2P-SEP9-2026'
-
 
 #Scattering test
 SETTLE_TIME_S = 3
 N_DISCARD_BUFFERS = 100
 N_AVG_BUFFERS = 30
+

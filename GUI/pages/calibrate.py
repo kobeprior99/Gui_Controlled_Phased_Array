@@ -9,7 +9,6 @@ from nicegui import APIRouter, ui
 import state
 import helpers
 from pathlib import Path
-from config import DEFAULT_CAL
 CAL_DIR = Path(__file__).resolve().parent.parent / 'Phase_Corrections'
 router = APIRouter()
 
