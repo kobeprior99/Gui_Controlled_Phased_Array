@@ -11,7 +11,7 @@ import serial
 from nicegui import ui
 
 import state
-from config import BAUDRATE
+from config import BAUDRATE, CP_PHASES
 from READ_S2P import get_phase_at_freq
 from PLUTO import stop_tx
 
@@ -48,11 +48,15 @@ async def set_com_port(port: str):
     except Exception as e:
         print(f'Failed to open serial port: {e}')
 
-def send_phases(phases: np.ndarray, safe: bool = False, ack_timeout: float = 0.5) -> bool | None:
+def send_phases(phases: np.ndarray, safe: bool = False, ack_timeout: float = 0.5,
+                include_cp: bool = True) -> bool | None:
     if state.ser is None:
         raise ConnectionError("Serial port is not connected.")
 
-    total_phase = (phases + state.PHASE_OFFSETS)
+    total_phase = phases + state.PHASE_OFFSETS
+    # sequentially rotated CP patches need a fixed compensation phase
+    if include_cp and state.CP_ARRAY:
+        total_phase = total_phase + CP_PHASES
     normalized_phase = total_phase % 360
     hardware_phases = np.uint8(np.round(normalized_phase * (256 / 360)))
 

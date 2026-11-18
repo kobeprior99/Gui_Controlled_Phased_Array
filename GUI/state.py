@@ -11,3 +11,4 @@ phase_inputs = []  # references to UI input elements
 selected = None
 SELECTED_COM_PORT = 'SELECT MCU PORT'
 PHASE_STEP = 360 / 256
+CP_ARRAY = False  # False: linear Tx array, True: circularly polarized array

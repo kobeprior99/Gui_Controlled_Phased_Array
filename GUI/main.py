@@ -72,7 +72,13 @@ def main_page():
     ]
 
     with ui.column().classes('w-full items-center'):
-        ui.label('Antenna Array Control').classes('text-3xl font-bold mb-8')
+        ui.label('Antenna Array Control').classes('text-3xl font-bold mb-4')
+        # Selects linear Tx array vs circularly polarized array (adds CP_PHASES, uses DX_CP/DY_CP)
+        ui.toggle(
+            {'linear': 'Linear Array', 'circular': 'Circularly Polarized Array'},
+            value='circular' if state.CP_ARRAY else 'linear',
+            on_change=lambda e: setattr(state, 'CP_ARRAY', e.value == 'circular')
+        ).classes('mb-8')
     
     ui.add_head_html('''
         <style>

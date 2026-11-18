@@ -13,7 +13,8 @@ import plotly.graph_objects as go
 from nicegui import APIRouter, ui
 import state
 import helpers
-from config import OAM_PHASES, RX_GAIN, TX_GAIN, SETTLE_TIME_S, N_DISCARD_BUFFERS, N_AVG_BUFFERS
+from config import RX_GAIN, TX_GAIN, SETTLE_TIME_S, N_DISCARD_BUFFERS, N_AVG_BUFFERS
+from oam_phases import get_oam_phases
 from PLUTO import tx, stop_tx, discard_buffer, get_dBFS, set_gain
 import numpy as np
 
@@ -21,7 +22,7 @@ router = APIRouter()
 
 
 async def oam_mode(mode: str, phase_confirmed: dict):
-    phases = OAM_PHASES * int(mode)
+    phases = get_oam_phases(mode)
     try:
         confirmed = await asyncio.to_thread(helpers.send_phases, phases, True)
     except Exception as e:

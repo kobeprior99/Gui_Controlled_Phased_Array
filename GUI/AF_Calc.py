@@ -27,7 +27,19 @@ import io
 import os
 #config file contains some useful constants that we'll make use of 
 from config import *
+import state
 DEFAULT_RX_GRID = None
+
+def get_spacing(cp: bool | None = None)->tuple:
+    '''
+    Element spacing (fraction of wavelength) for the selected array.
+    cp=None follows the main page toggle (state.CP_ARRAY).
+    Returns (dx, dy): DX_CP/DY_CP for the CP array, DX/DY for the linear array
+    '''
+    if cp is None:
+        cp = state.CP_ARRAY
+    return (DX_CP, DY_CP) if cp else (DX, DY)
+
 def find_betas(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     '''
     Calculate the phase shifts required to steer in certain direction
@@ -322,15 +334,16 @@ def create_af_animation(theta_start: float = 0, theta_end: float = 60,
     
     print(f"Generating {len(theta_range)} frames...")
     
+    dx_sel, dy_sel = get_spacing()
     for i, theta_deg in enumerate(theta_range):
         theta_rad = np.radians(theta_deg)
         
         # Calculate progressive phase shifts for beam steering
-        beta_x = -2 * np.pi * DX * np.sin(theta_rad) * np.cos(phi_rad)
-        beta_y = -2 * np.pi * DY * np.sin(theta_rad) * np.sin(phi_rad)
+        beta_x = -2 * np.pi * dx_sel * np.sin(theta_rad) * np.cos(phi_rad)
+        beta_y = -2 * np.pi * dy_sel * np.sin(theta_rad) * np.sin(phi_rad)
         
         # Generate frame
-        fig_3d, fig_uv = dispAF_frame(DX, DY, beta_x, beta_y, NUM_ELEMENTS, theta_deg)
+        fig_3d, fig_uv = dispAF_frame(dx_sel, dy_sel, beta_x, beta_y, NUM_ELEMENTS, theta_deg)
         
         # Convert 3D plot to image
         buf_3d = io.BytesIO()
@@ -381,14 +394,15 @@ def main():
     # dispAF(dx, dy, beta_x, beta_y,disp=True)
     create_af_animation()
 
-def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->np.ndarray:
+def runAF_Calc(dx: float | None,dy: float | None,theta: float,phi: float)->np.ndarray:
     '''
     run the array factor calculation to get progressive phase shifts
     and generate plot
     Parameters:
         dx: float
             horizontal spacing between elements (fraction of wavelength)
-        dx: float
+            None -> DX_CP if CP array selected else DX
+        dy: float
             vertical spacing between elements (fraction of wavelength)
         theta: float
             desired elevaiton steering angle
@@ -396,6 +410,10 @@ def runAF_Calc(dx: float,dy: float,theta: float,phi: float)->np.ndarray:
             desired azimuthal steering angle
     Returns: phases an array of the phases that go to each element 
     '''
+    if dx is None or dy is None:
+        sel_dx, sel_dy = get_spacing()
+        dx = sel_dx if dx is None else dx
+        dy = sel_dy if dy is None else dy
     betaX,betaY = find_betas(theta, phi, dx,dy) 
     phases = get_phase_shifts(betaX, betaY)
     dispAF(dx,dy,betaX,betaY,disp=False)

@@ -4,7 +4,7 @@ allows you to experiment with an electronically steered
 phased array in transmit and received mode.
 
 Author: Kobe Prior
-Last Edited: July 17 2026
+Last Edited: Nov 18 2026
 '''
 import asyncio
 import time
@@ -15,10 +15,10 @@ from nicegui import APIRouter, ui
 
 import state
 import helpers
-from config import DX, DY, THETA_RANGE, PHI_RANGE, RX_GAIN, TX_GAIN
-from AF_Calc import runAF_Calc
+from config import THETA_RANGE, PHI_RANGE, RX_GAIN, TX_GAIN
+from AF_Calc import runAF_Calc, get_spacing
 from PLUTO import get_energy, tx, stop_tx, discard_buffer, set_gain
-from create_default_rx_grid import DEFAULT_RX_GRID
+from create_default_rx_grid import get_default_rx_grid
 
 router = APIRouter()
 
@@ -89,9 +89,10 @@ def transmit_mode():
             ui.image('media/Default_Array.png').style('width: 35%;')
             ui.image('media/Default_Array2.png').style('width: 35%;')
 
+        default_dx, default_dy = get_spacing()  # DX_CP/DY_CP when CP array is selected
         with ui.row().classes('w-full justify-center items-center'):
-            dx = ui.number(label='dx (λ)', value=DX, min=0.1).style('width:20%')
-            dy = ui.number(label='dy (λ)', value=DY, min=0.1).style('width:20%')
+            dx = ui.number(label='dx (λ)', value=default_dx, min=0.1).style('width:20%')
+            dy = ui.number(label='dy (λ)', value=default_dy, min=0.1).style('width:20%')
             theta = ui.number(label='Theta (deg)', value=0, min=0, max=90).style('width:20%')
             phi = ui.number(label='Phi (deg)', value=0, min=0, max=360).style('width:20%')
 
@@ -220,12 +221,13 @@ def receive_mode():
             dialog.open()
 
         async def scan_task():
+            rx_grid = get_default_rx_grid()  # CP grid (DX_CP/DY_CP) if CP array is selected
             tx()
             await asyncio.sleep(1.0)  # 1-second delay for Tx power/local oscillator stabilization
-            n_steps = len(DEFAULT_RX_GRID)
+            n_steps = len(rx_grid)
             energies = np.zeros(n_steps)
 
-            for i, phases in enumerate(DEFAULT_RX_GRID):
+            for i, phases in enumerate(rx_grid):
                 helpers.send_phases(phases)
                 if i == 0:
                     for _ in range(10):

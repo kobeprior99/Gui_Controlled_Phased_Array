@@ -1,11 +1,13 @@
-from config import THETA_RANGE, PHI_RANGE, NSIDE, DX,DY
+from config import THETA_RANGE, PHI_RANGE, NSIDE, DX, DY, DX_CP, DY_CP
 import numpy as np
-def create_default_rx_search_grid(dx: float, dy: float)->None:
+import state
+
+def create_default_rx_search_grid(dx: float, dy: float)->np.ndarray:
     '''
     compute a list of phase shift lists for each search loaction for rx doa est.
     originally was a nested for loop but vectorized it for speed
     args:
-        dx,dy(float): element spacing
+        dx,dy(float): element spacing (fraction of wavelength)
     returns:
     phases (np.ndarray): vshape = (len(theta_range)*len(phi_range), num_elements)
     each row = num_elements phase values
@@ -29,9 +31,12 @@ def create_default_rx_search_grid(dx: float, dy: float)->None:
     phases_deg = np.degrees(total_phase) % 360
     return phases_deg.reshape(NSIDE * NSIDE, -1).T
 
-DEFAULT_RX_GRID = create_default_rx_search_grid(DX,DY)
-#debug
-'''
-for i, phase_row in enumerate(default_rx_grid):
-    print(f'Direction {i}: {phase_row}')
-'''
+# precomputed grids, one per array type
+DEFAULT_RX_GRID = create_default_rx_search_grid(DX, DY)
+DEFAULT_RX_GRID_CP = create_default_rx_search_grid(DX_CP, DY_CP)
+
+def get_default_rx_grid(cp: bool | None = None)->np.ndarray:
+    '''Grid for the selected array. cp=None follows the main page toggle.'''
+    if cp is None:
+        cp = state.CP_ARRAY
+    return DEFAULT_RX_GRID_CP if cp else DEFAULT_RX_GRID

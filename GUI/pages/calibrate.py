@@ -16,7 +16,7 @@ router = APIRouter()
 def calibrate():
     ui.button('⬅ Back', on_click=ui.navigate.back)
     try: 
-        helpers.send_phases(np.zeros(16, dtype=int))
+        helpers.send_phases(np.zeros(16, dtype=int), include_cp=False)
     except Exception as e:
         ui.notify(f'Failed to send phases: {e}', color='red')
     else:

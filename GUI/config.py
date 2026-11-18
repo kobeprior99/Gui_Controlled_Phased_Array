@@ -7,7 +7,7 @@ LAMBDA = C/FREQ
 NUM_ELEMENTS = 16
 NSIDE = 4
 
-#RX grid 
+#RX grid Reference Coordinate System on Beam Steering page
 #spacing in meters
 dx_m = 50e-3
 dy_m = 57.5e-3
@@ -15,6 +15,18 @@ dy_m = 57.5e-3
 ##dx dy in wavelengths is:
 DX = dx_m/LAMBDA 
 DY = dy_m/LAMBDA
+
+CP_PHASES = np.array([
+        270.0, 0.0, 270.0, 90.0,
+        180.0, 90.0, 180.0, 0.0,
+        270.0, 0.0, 270.0, 90.0,
+        180.0, 90.0, 180.0, 0.0
+    ]) 
+dx_m_cp = 59.592e-3
+dy_m_cp = 59.592e-3
+##dx dy in wavelengths is:
+DX_CP = dx_m_cp/LAMBDA 
+DY_CP = dy_m_cp/LAMBDA
 
 #We're limited to the resolution of our array, the half power beam width is rather large
 num_theta = 8
@@ -39,19 +51,7 @@ BUFFER_SIZE = 4*2048
 NUM_AVG = 1
 SETTLE_TIME = 1 #time to transmit before capturing burst
 
-OAM_PHASES = np.array([
-        130.58, 105.93, 74.07, 49.42,
-        158.73, 130.58, 49.42, 21.27,
-        -158.73, -130.58, -49.42, -21.27,
-        -130.58, -105.93, -74.07, -49.42,
-    ]) 
-#the circularly polarized array has sequentially rotated elements and we must compensate for the phase
-CP_PHASES = np.array([
-        130.58, 105.93, 74.07, 49.42,
-        158.73, 130.58, 49.42, 21.27,
-        -158.73, -130.58, -49.42, -21.27,
-        -130.58, -105.93, -74.07, -49.42,
-    ]) 
+
 #calibration directory
 S2PDIR = 'S2P-SEP9-2026'
 
