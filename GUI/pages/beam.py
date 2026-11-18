@@ -17,7 +17,7 @@ import state
 import helpers
 from config import THETA_RANGE, PHI_RANGE, RX_GAIN, TX_GAIN
 from AF_Calc import runAF_Calc, get_spacing
-from PLUTO import get_energy, tx, stop_tx, discard_buffer, set_gain
+from PLUTO import get_energy, power_to_dBFS, tx, stop_tx, discard_buffer, set_gain
 from create_default_rx_grid import get_default_rx_grid
 
 router = APIRouter()
@@ -97,12 +97,8 @@ def transmit_mode():
             phi = ui.number(label='Phi (deg)', value=0, min=0, max=360).style('width:20%')
 
         with ui.row().classes('w-full justify-center items-center'):
-            y_min = ui.number(label='Set Minimum Power for Graph', value=0, min=1).style('width:30%')
-            y_max = ui.number(label='Set Maximum Power for Graph', value=10, min=1).style('width:30%')
-
-        # Added a toggle switch to let the user select between Linear and Logarithmic scales
-        with ui.row().classes('w-full justify-center items-center m-2'):
-            scale_type = ui.toggle({'linear': 'Linear', 'log': 'Logarithmic'}, value='linear')
+            y_min = ui.number(label='Set Minimum Power for Graph (dBFS)', value=-100, max=0).style('width:30%')
+            y_max = ui.number(label='Set Maximum Power for Graph (dBFS)', value=0, max=10).style('width:30%')
 
         # ---- SDR Gain Controls ----
         ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')
@@ -112,7 +108,7 @@ def transmit_mode():
         fig.update_layout(
             margin=dict(l=0, r=0, t=0, b=0),
             xaxis_title='Time(s)',
-            yaxis_title='Avg Power Received'
+            yaxis_title='Avg Power Received (dBFS)'
         )
         live_plot = ui.plotly(fig).classes('w-3/4 h-64')
         image_container = ui.row().classes('justify-center items-center').style('order:2; width:90%;')
@@ -140,7 +136,7 @@ def transmit_mode():
 
             while not stop_event.is_set():
                 t = time.time() - start_time
-                energy = get_energy()
+                energy = power_to_dBFS(get_energy())
                 t_values.append(t)
                 energy_values.append(energy)
                 t_values = t_values[-100:]
@@ -150,16 +146,7 @@ def transmit_mode():
                 fig.data[0].y = energy_values
 
                 try:
-                    # Dynamically adjust type and range based on the scale type toggle
-                    if scale_type.value == 'log':
-                        import math
-                        # Plotly logs require the log10 value of the boundaries when hardcoding ranges
-                        # Also protecting against 0/negative values with max(0.001, ...)
-                        low_bound = math.log10(max(0.001, float(y_min.value)))
-                        high_bound = math.log10(max(0.001, float(y_max.value)))
-                        fig.update_yaxes(type='log', range=[low_bound, high_bound])
-                    else:
-                        fig.update_yaxes(type='linear', range=[int(y_min.value), int(y_max.value)])
+                    fig.update_yaxes(type='linear', range=[float(y_min.value), float(y_max.value)])
                 except Exception:
                     pass
 
