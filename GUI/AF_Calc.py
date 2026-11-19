@@ -28,7 +28,6 @@ import os
 #config file contains some useful constants that we'll make use of 
 from config import *
 import state
-DEFAULT_RX_GRID = None
 
 def get_spacing(cp: bool | None = None)->tuple:
     '''
@@ -76,7 +75,7 @@ def get_phase_shifts(beta_x: float, beta_y: float)->np.ndarray:
         beta_x(float):
         beta_y(float):
     Returns:
-        1D array of phases in degrees size =NUM_ELEMENTS defined in config fil
+        1D array of phases in degrees size = NUM_ELEMENTS defined in config fil
     '''
     #create index grids
     M, N = np.meshgrid(np.arange(NSIDE), np.arange(NSIDE), indexing='ij')
@@ -386,13 +385,41 @@ def create_af_animation(theta_start: float = 0, theta_end: float = 60,
     print(f"Animations saved to media/AF_animation.gif and media/UV_animation.gif")
 
 def main():
+
     # dx = float(input('enter the horizontal spacing dx in terms of wavelengths: '))
     # dy = float(input('enter the vertical spacing dy in terms of wavelengths: '))
     # desired_phi = float(input('enter the azimuthal steering direction (degrees): '))
     # desired_theta = float(input('enter the elevation steering direction (degrees): '))
     # beta_x, beta_y = find_betas(desired_theta, desired_phi, dx, dy)
     # dispAF(dx, dy, beta_x, beta_y,disp=True)
-    create_af_animation()
+    np.set_printoptions(precision=2, suppress=True)
+
+    # Desired beam steering directions (theta, phi) in degrees
+    steering_directions = [
+        (15, 0),
+        (15, 90),
+        (20, 45),
+    ]
+
+    for cp in (False, True):
+        dx, dy = get_spacing(cp)
+
+        print('\n' + '=' * 60)
+        print('CP Array' if cp else 'Linear Array')
+        print(f'Element spacing: dx={dx}, dy={dy}')
+        print('=' * 60)
+
+        for theta_0, phi_0 in steering_directions:
+            beta_x, beta_y = find_betas(theta_0, phi_0, dx, dy)
+            phases = get_phase_shifts(beta_x, beta_y)
+
+            print(f'\nSteering: theta={theta_0}°, phi={phi_0}°')
+            print(f'Beta X: {np.degrees(beta_x):.2f}°')
+            print(f'Beta Y: {np.degrees(beta_y):.2f}°')
+
+            print('Phase shifts:')
+            print(phases)
+    #create_af_animation()
 
 def runAF_Calc(dx: float | None,dy: float | None,theta: float,phi: float)->np.ndarray:
     '''
