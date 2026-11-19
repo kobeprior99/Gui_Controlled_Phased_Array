@@ -1,7 +1,7 @@
 '''
 File: AF_Calc.py 
 Author: Kobe Prior
-Date: 2025-09-21
+Last Modified: Nov 18, 2026 
 Description:
 
 This module is used to find the progressive phase shifted to apply to achieve
