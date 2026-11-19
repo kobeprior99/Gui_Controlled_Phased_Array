@@ -86,7 +86,7 @@ def transmit_mode():
                 .classes('text-base text-gray-600 text-center')
 
         with ui.row().classes('w-full justify-center items-center'):
-            ui.image('media/Array_Configuration.png').style('width: 7%;')
+            ui.image('media/Array_Configuration.png').style('width: 75%;')
 
         default_dx, default_dy = get_spacing()  # DX_CP/DY_CP when CP array is selected
         with ui.row().classes('w-full justify-center items-center'):
