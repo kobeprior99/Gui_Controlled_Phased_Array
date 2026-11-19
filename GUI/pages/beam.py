@@ -109,7 +109,11 @@ def transmit_mode():
             xaxis_title='Time(s)',
             yaxis_title='Avg Power Received (dBFS)'
         )
-        live_plot = ui.plotly(fig).classes('w-3/4 h-64')
+        with ui.row().classes('w-full justify-center items-center no-wrap'):
+            live_plot = ui.plotly(fig).classes('w-3/4 h-64')
+            with ui.card().classes('w-48 items-center p-4'):
+                ui.label('Current Level').classes('text-sm text-gray-600')
+                dbfs_label = ui.label('-- dBFS').classes('font-mono text-3xl font-bold')
         image_container = ui.row().classes('justify-center items-center').style('order:2; width:90%;')
         stop_event = asyncio.Event()
 
@@ -136,6 +140,7 @@ def transmit_mode():
             while not stop_event.is_set():
                 t = time.time() - start_time
                 energy = power_to_dBFS(get_energy())
+                dbfs_label.set_text(f'{energy:.1f} dBFS')
                 t_values.append(t)
                 energy_values.append(energy)
                 t_values = t_values[-100:]
@@ -151,7 +156,6 @@ def transmit_mode():
 
                 live_plot.update()
                 await asyncio.sleep(0.05)
-
         def send_current_phase():
             phases = runAF_Calc(dx.value, dy.value, theta.value, phi.value)
             helpers.send_phases(phases)
