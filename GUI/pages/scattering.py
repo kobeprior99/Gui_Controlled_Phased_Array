@@ -105,8 +105,7 @@ def scattering():
         ui.label('Attach provided 4x4 antenna array port 1 to top left ascending going down and to the right').classes('text-base text-gray-600 text-center')
         
         with ui.row().classes('w-full justify-center items-center'):
-            ui.image('media/Default_Array.png').style('width: 35%;')
-            ui.image('media/Default_Array2.png').style('width: 35%;')
+            ui.image('media/Array_Configuration.png').style('width: 70%;')
 
     # ---- SDR Gain Controls ----
     ui.label('SDR Gain Controls').classes('text-2xl font-bold text-center mt-6')

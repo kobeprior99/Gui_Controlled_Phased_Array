@@ -9,8 +9,8 @@ NSIDE = 4
 
 #RX grid Reference Coordinate System on Beam Steering page
 #spacing in meters
-dx_m = 50e-3
-dy_m = 57.5e-3
+dx_m = 57.5e-3
+dy_m = 50.0e-3
 
 ##dx dy in wavelengths is:
 DX = dx_m/LAMBDA 

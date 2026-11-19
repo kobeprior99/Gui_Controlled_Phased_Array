@@ -24,7 +24,7 @@ def create_default_rx_search_grid(dx: float, dy: float)->np.ndarray:
 
     # compute total phase shift (broadcasted)
     # shape: (nside, nside, len(theta), len(phi))
-    total_phase = (nx_idx[:, None, None, None] * beta_x[None,None, :, :] +
+    total_phase = (nx_idx[:, None, None, None] * beta_x[None,None, :, :] -
         ny_idx[None, :, None, None] * beta_y[None, None, None, :])
 
     # convert to degrees and wrap to 0–360

@@ -86,8 +86,7 @@ def transmit_mode():
                 .classes('text-base text-gray-600 text-center')
 
         with ui.row().classes('w-full justify-center items-center'):
-            ui.image('media/Default_Array.png').style('width: 35%;')
-            ui.image('media/Default_Array2.png').style('width: 35%;')
+            ui.image('media/Array_Configuration.png').style('width: 7%;')
 
         default_dx, default_dy = get_spacing()  # DX_CP/DY_CP when CP array is selected
         with ui.row().classes('w-full justify-center items-center'):
@@ -186,8 +185,8 @@ def receive_mode():
                 .classes('text-base text-gray-600 text-center')
 
         with ui.row().classes('w-full justify-center items-center'):
-            ui.image('media/Default_Array.png').style('width: 45%;')
-            ui.image('media/Default_Array2.png').style('width: 45%;')
+            ui.image('media/Array_Configuration.png').style('width: 70%;')
+
         with ui.row().classes('w-full justify-center items-center'):
             ui.label('Place the transmitting antenna somewhere within line of sight of the receiving array, then press start when you are ready to scan')\
                 .classes('text-base text-gray-600 text-center')

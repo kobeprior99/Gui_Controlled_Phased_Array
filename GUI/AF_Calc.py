@@ -68,19 +68,23 @@ def find_betas(theta_0: float, phi_0: float, dx: float, dy: float)->tuple:
     return beta_X, beta_Y
 
 
-def get_phase_shifts(beta_x: float, beta_y: float)->np.ndarray:
+def get_phase_shifts(beta_x: float, beta_y: float) -> np.ndarray:
     '''
-    Get the phase shifts to apply to each element in a N element array
-    Parameter:
-        beta_x(float):
-        beta_y(float):
+    Get the phase shifts to apply to each element in the NSIDE x NSIDE array.
+
+    Convention (matches figure): +x is to the right, +y is up the page.
+    Element 1 (index 0) is the top-left element and is the phase reference (0 deg).
+    Elements are numbered row-major: left to right along a row, then down.
+
+    Parameters:
+        beta_x (float): progressive phase per element along +x (radians)
+        beta_y (float): progressive phase per element along +y (radians)
     Returns:
-        1D array of phases in degrees size = NUM_ELEMENTS defined in config fil
+        1D array of phases in degrees, size = NUM_ELEMENTS
     '''
-    #create index grids
+    # rows (M) move down = -y, columns (N) move right = +x
     M, N = np.meshgrid(np.arange(NSIDE), np.arange(NSIDE), indexing='ij')
-    #compute phase shifts for each element
-    phases = (beta_x * M + beta_y * N)
+    phases = beta_x * N - beta_y * M
     phases = np.degrees(phases) % 360
     return phases.flatten()
 
@@ -399,6 +403,7 @@ def main():
         (15, 0),
         (15, 90),
         (20, 45),
+        (30, 0),
     ]
 
     for cp in (False, True):
@@ -419,7 +424,7 @@ def main():
 
             print('Phase shifts:')
             print(phases)
-    #create_af_animation()
+    create_af_animation()
 
 def runAF_Calc(dx: float | None,dy: float | None,theta: float,phi: float)->np.ndarray:
     '''
