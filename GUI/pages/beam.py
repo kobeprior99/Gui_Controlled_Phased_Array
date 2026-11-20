@@ -15,13 +15,39 @@ from nicegui import APIRouter, ui
 
 import state
 import helpers
-from config import THETA_LIST, PHI_LIST, RX_GAIN, TX_GAIN
+from config import THETA_LIST, PHI_LIST, RX_GAIN, TX_GAIN,UV_STEP,r_max
 from AF_Calc import runAF_Calc, get_spacing
 from PLUTO import get_tone_energy,get_dBFS, tx, stop_tx, discard_buffer, set_gain
 from create_default_rx_grid import ensure_default_rx_lut 
 
 N_SETTLE_BUFFERS = 5
-N_AVG_SCAN = 8
+N_AVG_SCAN = 3
+def refine_peak(u_pts, v_pts, powers, step=UV_STEP, half_width=1.0, n_fine=81):
+    '''
+    Sinc-interpolate the sampled power surface near the coarse peak and
+    return the off-grid peak (u, v) and whether it is near the scan edge.
+    '''
+    k = np.argmax(powers)
+    uc, vc = u_pts[k], v_pts[k]
+    uf = np.linspace(uc - half_width * step, uc + half_width * step, n_fine)
+    vf = np.linspace(vc - half_width * step, vc + half_width * step, n_fine)
+
+    Ku = np.sinc((uf[:, None] - u_pts[None, :]) / step)   # (n_fine, K)
+    Kv = np.sinc((vf[:, None] - v_pts[None, :]) / step)   # (n_fine, K)
+    surf = np.einsum('ik,jk,k->ji', Ku, Kv, powers)       # rows = v, cols = u
+
+    j, i = np.unravel_index(np.argmax(surf), surf.shape)
+    near_edge = np.hypot(uc, vc) > r_max - step
+    return uf[i], vf[j], near_edge
+def sinc_surface(u_pts, v_pts, powers, step=UV_STEP, n=121):
+    '''Sinc-interpolate the whole scan region onto a fine (u, v) grid.'''
+    g = np.linspace(-r_max, r_max, n)
+    U, V = np.meshgrid(g, g)
+    Ku = np.sinc((g[:, None] - u_pts[None, :]) / step)   # (n, K)
+    Kv = np.sinc((g[:, None] - v_pts[None, :]) / step)   # (n, K)
+    S = np.einsum('jk,ik,k->ji', Kv, Ku, powers)         # rows = v, cols = u
+    S = np.ma.masked_where(U**2 + V**2 > r_max**2, S)    # only show inside the scan circle
+    return U, V, S
 router = APIRouter()
 
 @router.page('/beam')
@@ -260,38 +286,58 @@ def receive_mode():
                 dialog.close()
                 return
             powers /= peak_val
-            peak = np.argmax(powers)
-            theta_peak = THETA_LIST[peak]
-            phi_peak = PHI_LIST[peak]
 
             u_pts = np.sin(np.deg2rad(THETA_LIST)) * np.cos(np.deg2rad(PHI_LIST))
             v_pts = np.sin(np.deg2rad(THETA_LIST)) * np.sin(np.deg2rad(PHI_LIST))
 
+            # grid peak (no interpolation)
+            peak = np.argmax(powers)
+            theta_grid, phi_grid = THETA_LIST[peak], PHI_LIST[peak]
+
+            # refined peak (sinc interpolation)
+            u_pk, v_pk, near_edge = refine_peak(u_pts, v_pts, powers)
+            rho = min(np.hypot(u_pk, v_pk), 1.0)
+            theta_ref = np.degrees(np.arcsin(rho))
+            phi_ref = np.degrees(np.arctan2(v_pk, u_pk)) % 360
+
+            def label_box(ax, x, y, text):
+                ax.annotate(text, xy=(x, y), xytext=(0, 14), ha='center', va='center',
+                            textcoords='offset points', color='white', fontsize=10,
+                            bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5), zorder=100)
+
+            levels = np.linspace(0, 1, 21)   # same color scale on both plots
+
+# ---- plot 1: raw grid ----
             fig, ax = plt.subplots(figsize=(8, 6))
-            cf = ax.tricontourf(u_pts, v_pts, powers, levels=20, cmap='plasma')
-            ax.scatter(u_pts, v_pts, c='k', s=8, alpha=0.4)          # beam centers
+            cf = ax.tricontourf(u_pts, v_pts, powers, levels=levels, cmap='plasma')
+            ax.scatter(u_pts, v_pts, c='k', s=8, alpha=0.4)
             ax.plot(u_pts[peak], v_pts[peak], 'ro', markersize=10)
-            ax.annotate(
-                fr"$\phi$: {phi_peak:.1f}°, $\theta$: {theta_peak:.1f}°",
-                xy=(u_pts[peak], v_pts[peak]),
-                xytext=(0, 14),
-                ha='center', va='center',
-                textcoords='offset points',
-                color='white', fontsize=10,
-                bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
-                zorder=100
-            )
-            plt.colorbar(cf, ax=ax, label='Received tone power (normalized)')
-            ax.set_xlabel('u = sin(θ)cos(φ)')
-            ax.set_ylabel('v = sin(θ)sin(φ)')
-            ax.set_aspect('equal', adjustable='box')
-            ax.set_title('Beam Scan')
-            plt.savefig('media/rx_heat.png', dpi=300)
-            plt.close()
+            label_box(ax, u_pts[peak], v_pts[peak], fr"$\phi$: {phi_grid:.1f}°, $\theta$: {theta_grid:.1f}°")
+            fig.colorbar(cf, ax=ax, label='Received tone power (normalized)')
+            ax.set_xlabel('u = sin(θ)cos(φ)'); ax.set_ylabel('v = sin(θ)sin(φ)')
+            ax.set_aspect('equal', adjustable='box'); ax.set_title('Beam Scan')
+            fig.savefig('media/rx_heat.png', dpi=300)
+            plt.close(fig)
+
+# ---- plot 2: sinc-interpolated ----
+            U, V, S = sinc_surface(u_pts, v_pts, powers)
+            fig2, ax2 = plt.subplots(figsize=(8, 6))
+            cf2 = ax2.contourf(U, V, np.clip(S, 0, 1), levels=levels, cmap='plasma')
+            ax2.scatter(u_pts, v_pts, c='k', s=8, alpha=0.4)
+            ax2.plot(u_pts[peak], v_pts[peak], 'wo', markersize=8, mfc='none')   # grid max
+            ax2.plot(u_pk, v_pk, 'ro', markersize=10)                            # refined peak
+            label_box(ax2, u_pk, v_pk,
+                      fr"$\phi$: {phi_ref:.1f}°, $\theta$: {theta_ref:.1f}°" + ("*" if near_edge else ""))
+            fig2.colorbar(cf2, ax=ax2, label='Received tone power (normalized)')
+            ax2.set_xlabel('u = sin(θ)cos(φ)'); ax2.set_ylabel('v = sin(θ)sin(φ)')
+            ax2.set_aspect('equal', adjustable='box'); ax2.set_title('Beam Scan (Sinc-interpolated)')
+            fig2.savefig('media/rx_heat_interp.png', dpi=300)
+            plt.close(fig2)
 
             image_container.clear()
             with image_container:
                 ui.image('media/rx_heat.png').style('width:65%;').force_reload()
+                ui.image('media/rx_heat_interp.png').style('width:65%;').force_reload()
 
             dialog.close()
 
