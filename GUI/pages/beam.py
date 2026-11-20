@@ -15,7 +15,7 @@ from nicegui import APIRouter, ui
 
 import state
 import helpers
-from config import THETA_RANGE, PHI_RANGE, RX_GAIN, TX_GAIN
+from config import THETA_LIST, PHI_LIST, RX_GAIN, TX_GAIN
 from AF_Calc import runAF_Calc, get_spacing
 from PLUTO import get_energy, power_to_dBFS, tx, stop_tx, discard_buffer, set_gain
 from create_default_rx_grid import get_default_rx_grid
@@ -227,38 +227,33 @@ def receive_mode():
                 label.set_text(f"Scanning {i+1}/{n_steps}")
 
             stop_tx()
+            energies /= np.max(energies)
+            peak = np.argmax(energies)
+            theta_peak = THETA_LIST[peak]
+            phi_peak = PHI_LIST[peak]
 
-            energies_2D = energies.reshape(len(THETA_RANGE), len(PHI_RANGE))
-            energies_2D /= np.max(energies_2D)
-            peak_idx = np.unravel_index(np.argmax(energies_2D), energies_2D.shape)
-            theta_peak = THETA_RANGE[peak_idx[0]]
-            phi_peak = PHI_RANGE[peak_idx[1]]
+            # uv coordinates of each beam
+            u_pts = np.sin(np.deg2rad(THETA_LIST)) * np.cos(np.deg2rad(PHI_LIST))
+            v_pts = np.sin(np.deg2rad(THETA_LIST)) * np.sin(np.deg2rad(PHI_LIST))
 
             fig, ax = plt.subplots(figsize=(8, 6))
-            im = ax.imshow(
-                energies_2D,
-                extent=[PHI_RANGE[0], PHI_RANGE[-1], THETA_RANGE[0], THETA_RANGE[-1]],
-                origin='lower',
-                aspect='auto',
-                cmap='plasma'
-            )
-
-            ax.plot(phi_peak, theta_peak, 'ro', markersize=10)
+            cf = ax.tricontourf(u_pts, v_pts, energies, levels=20, cmap='plasma')
+            ax.scatter(u_pts, v_pts, c='k', s=8, alpha=0.4)          # beam centers
+            ax.plot(u_pts[peak], v_pts[peak], 'ro', markersize=10)
             ax.annotate(
-                fr"$\phi$: {phi_peak:.1f}°,$\theta$: {theta_peak:.1f}°",
-                xy=(phi_peak, theta_peak),
-                xytext=(0, 10),
-                ha='center',
-                va='center',
+                fr"$\phi$: {phi_peak:.1f}°, $\theta$: {theta_peak:.1f}°",
+                xy=(u_pts[peak], v_pts[peak]),
+                xytext=(0, 14),
+                ha='center', va='center',
                 textcoords='offset points',
-                color='white',
-                fontsize=10,
+                color='white', fontsize=10,
                 bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
                 zorder=100
             )
-            plt.colorbar(im, ax=ax, label='Received energy')
-            ax.set_xlabel('Phi [deg]')
-            ax.set_ylabel('Theta [deg]')
+            plt.colorbar(cf, ax=ax, label='Received energy (normalized)')
+            ax.set_xlabel('u = sin(θ)cos(φ)')
+            ax.set_ylabel('v = sin(θ)sin(φ)')
+            ax.set_aspect('equal', adjustable='box')
             ax.set_title('Beam Scan')
             plt.savefig('media/rx_heat.png', dpi=300)
             plt.close()

@@ -29,13 +29,29 @@ DX_CP = dx_m_cp/LAMBDA
 DY_CP = dy_m_cp/LAMBDA
 
 #We're limited to the resolution of our array, the half power beam width is rather large
-num_theta = 8
-num_phi = 32
-#8 values
-THETA_RANGE = np.linspace(0,45, num_theta)
-#32 values
-PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
-#Total of 256 locations to scan through
+HPBW_DEG = 30        # full -3 dB width you measured
+SCAN_MAX_DEG = 45
+
+hpbw_u = 2 * np.sin(np.deg2rad(HPBW_DEG / 2))   # beam width in uv, ~0.52
+UV_STEP = hpbw_u / 2                            # ~0.26, crossover loss ~1 dB
+
+r_max = np.sin(np.deg2rad(SCAN_MAX_DEG))
+n = int(np.ceil(r_max / UV_STEP))
+g = np.arange(-n, n + 1) * UV_STEP
+U, V = np.meshgrid(g, g)
+mask = U**2 + V**2 <= r_max**2 + 1e-9
+u_pts, v_pts = U[mask], V[mask]
+
+THETA_LIST = np.degrees(np.arcsin(np.hypot(u_pts, v_pts)))
+PHI_LIST   = np.degrees(np.arctan2(v_pts, u_pts)) % 360
+
+# num_theta = 8
+# num_phi = 32
+# #8 values
+# THETA_RANGE = np.linspace(0,45, num_theta)
+# #32 values
+# PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
+# #Total of 256 locations to scan through
 
 #PLUTO config
 BASE_BAND = 100e3
