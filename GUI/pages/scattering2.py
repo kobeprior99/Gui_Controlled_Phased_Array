@@ -196,53 +196,62 @@ def scattering2():
                 .on('click', lambda _, t=target: select_hermite_image(t))
             image_elements[target] = img
 
-    # ---- Live dBFS Power Plot ----
-    # Replaces the old "Record Noise" / "Record Backscattered Power" buttons: instead of two
-    # discrete averaged snapshots, transmit continuously and watch a live dBFS trace. Read the
-    # noise/coupling floor off the trace before the target is illuminated, then read the
-    # backscattered level once it is — both come off the same live plot.
+    # ---- Live dBFS Power Plot (same plotting as tx mode) ----
     ui.label('Backscattered Power (Live)').classes('text-2xl font-bold text-center mt-6')
     ui.label('Press Start to transmit and stream live received power. Watch the trace settle to '
              'read the noise/coupling floor, then read the scattered level once the target is illuminated. '
              'Press Stop when done.').classes('text-base text-gray-600 text-center')
 
-    dbfs_fig = go.Figure(go.Scatter(x=[], y=[], mode='lines', name='Received Power'))
-    dbfs_fig.update_layout(
+    with ui.row().classes('w-full justify-center items-center'):
+        y_min = ui.number(label='Set Minimum Power for Graph (dBFS)', value=-100, max=0).style('width:30%')
+        y_max = ui.number(label='Set Maximum Power for Graph (dBFS)', value=0, max=10).style('width:30%')
+
+    fig = go.Figure(go.Scatter(x=[], y=[], mode='lines', name='Received Energy'))
+    fig.update_layout(
         margin=dict(l=0, r=0, t=0, b=0),
-        xaxis_title='Time (s)',
-        yaxis_title='Power (dBFS)'
+        xaxis_title='Time(s)',
+        yaxis_title='Avg Power Received (dBFS)'
     )
-    dbfs_live_plot = ui.plotly(dbfs_fig).classes('w-3/4 h-64 mx-auto')
-    dbfs_current_label = ui.label('').classes('text-xl font-bold text-center mt-2')
+    with ui.row().classes('w-full justify-center items-center no-wrap'):
+        live_plot = ui.plotly(fig).classes('w-3/4 h-64')
+        with ui.card().classes('w-48 items-center p-4'):
+            ui.label('Current Level').classes('text-sm text-gray-600')
+            dbfs_label = ui.label('-- dBFS').classes('font-mono text-3xl font-bold')
+
     dbfs_stop_event = asyncio.Event()
 
     async def live_dbfs_update():
         t_values = []
-        dbfs_values = []
+        dBFS_values = []
         start_time = time.time()
 
-        # Flush stale buffers before the first fresh reading, same as the old averaged measurement.
+        # Flush stale buffers before the first fresh reading
         for _ in range(N_DISCARD_BUFFERS):
             discard_buffer()
 
         while not dbfs_stop_event.is_set():
             t = time.time() - start_time
             try:
-                dbfs = get_dBFS()
+                dBFS = get_dBFS()
             except Exception as e:
                 ui.notify(f'Failed to read dBFS: {e}', color='red')
                 break
 
+            dbfs_label.set_text(f'{dBFS:.1f} dBFS')
             t_values.append(t)
-            dbfs_values.append(dbfs)
-            t_values = t_values[-200:]
-            dbfs_values = dbfs_values[-200:]
+            dBFS_values.append(dBFS)
+            t_values = t_values[-100:]
+            dBFS_values = dBFS_values[-100:]
 
-            dbfs_fig.data[0].x = t_values
-            dbfs_fig.data[0].y = dbfs_values
-            dbfs_live_plot.update()
-            dbfs_current_label.set_text(f'Current: {dbfs:.2f} dBFS')
+            fig.data[0].x = t_values
+            fig.data[0].y = dBFS_values
 
+            try:
+                fig.update_yaxes(type='linear', range=[float(y_min.value), float(y_max.value)])
+            except Exception:
+                pass
+
+            live_plot.update()
             await asyncio.sleep(0.05)
 
     def start_live_dbfs():
