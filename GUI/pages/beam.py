@@ -17,9 +17,11 @@ import state
 import helpers
 from config import THETA_LIST, PHI_LIST, RX_GAIN, TX_GAIN
 from AF_Calc import runAF_Calc, get_spacing
-from PLUTO import get_energy, power_to_dBFS, tx, stop_tx, discard_buffer, set_gain
-from create_default_rx_grid import get_default_rx_grid
+from PLUTO import get_tone_energy,get_dBFS, tx, stop_tx, discard_buffer, set_gain
+from create_default_rx_grid import ensure_default_rx_lut 
 
+N_SETTLE_BUFFERS = 5
+N_AVG_SCAN = 8
 router = APIRouter()
 
 @router.page('/beam')
@@ -134,20 +136,20 @@ def transmit_mode():
 
         async def live_update():
             t_values = []
-            energy_values = []
+            dBFS_values = []
             start_time = time.time()
 
             while not stop_event.is_set():
                 t = time.time() - start_time
-                energy = power_to_dBFS(get_energy())
-                dbfs_label.set_text(f'{energy:.1f} dBFS')
+                dBFS = get_dBFS()
+                dbfs_label.set_text(f'{dBFS:.1f} dBFS')
                 t_values.append(t)
-                energy_values.append(energy)
+                dBFS_values.append(dBFS)
                 t_values = t_values[-100:]
-                energy_values = energy_values[-100:]
+                dBFS_values = dBFS_values[-100:]
 
                 fig.data[0].x = t_values
-                fig.data[0].y = energy_values
+                fig.data[0].y = dBFS_values
 
                 try:
                     fig.update_yaxes(type='linear', range=[float(y_min.value), float(y_max.value)])
@@ -156,6 +158,7 @@ def transmit_mode():
 
                 live_plot.update()
                 await asyncio.sleep(0.05)
+
         def send_current_phase():
             phases = runAF_Calc(dx.value, dy.value, theta.value, phi.value)
             helpers.send_phases(phases)
@@ -203,41 +206,69 @@ def receive_mode():
         add_rx_gain_slider()
 
     image_container = ui.row().classes('w-full justify-center items-center').style('order:2;')
-
+    scan_running = {'value': False}
     def Scan_Beam():
+        if scan_running['value']:
+            ui.notify('A scan is already running', type='warning')
+            return
+        scan_running['value'] = True
+
         with ui.dialog() as dialog, ui.card():
             label = ui.label('Starting beam scan...')
             ui.linear_progress(show_value=False).props('indeterminate')
             dialog.open()
 
+        def measure(i):
+            '''Blocking: runs in a worker thread, never touches the UI.'''
+            if not helpers.apply_lut(i):
+                raise RuntimeError(f'MCU did not confirm array state {i}')
+            for _ in range(N_SETTLE_BUFFERS):
+                discard_buffer()
+            return get_tone_energy(N_AVG_SCAN)
+
         async def scan_task():
-            rx_grid = get_default_rx_grid()  # CP grid (DX_CP/DY_CP) if CP array is selected
-            tx()
-            await asyncio.sleep(1.0)  # 1-second delay for Tx power/local oscillator stabilization
-            n_steps = len(rx_grid)
-            energies = np.zeros(n_steps)
+            try:
+                # Table on the MCU must match the current grid, calibration, and CP setting
+                rx_grid, ok = await asyncio.to_thread(ensure_default_rx_lut)
+                if not ok:
+                    ui.notify('MCU did not confirm LUT upload', color='red')
+                    return
 
-            for i, phases in enumerate(rx_grid):
-                helpers.send_phases(phases)
-                if i == 0:
-                    for _ in range(10):
-                        discard_buffer()
-                energies[i] = get_energy()
-                await asyncio.sleep(10e-6)
-                label.set_text(f"Scanning {i+1}/{n_steps}")
+                n_steps = len(rx_grid)
+                powers = np.zeros(n_steps)
 
-            stop_tx()
-            energies /= np.max(energies)
-            peak = np.argmax(energies)
+                tx()
+                await asyncio.sleep(1.0)  # Tx power / local oscillator stabilization
+
+                for i in range(n_steps):
+                    powers[i] = await asyncio.to_thread(measure, i)
+                    label.set_text(f"Scanning {i+1}/{n_steps}")
+            except Exception as e:
+                ui.notify(f'Scan failed: {e}', color='red')
+                return
+            finally:
+                stop_tx()
+                scan_running['value'] = False
+                # dialog is closed below on success, or here on failure
+                if not (locals().get('powers') is not None and np.any(powers)):
+                    dialog.close()
+
+            # ---- normalize and plot ----
+            peak_val = np.max(powers)
+            if peak_val <= 0:
+                ui.notify('No signal detected, check TX/RX gain and connections', color='red')
+                dialog.close()
+                return
+            powers /= peak_val
+            peak = np.argmax(powers)
             theta_peak = THETA_LIST[peak]
             phi_peak = PHI_LIST[peak]
 
-            # uv coordinates of each beam
             u_pts = np.sin(np.deg2rad(THETA_LIST)) * np.cos(np.deg2rad(PHI_LIST))
             v_pts = np.sin(np.deg2rad(THETA_LIST)) * np.sin(np.deg2rad(PHI_LIST))
 
             fig, ax = plt.subplots(figsize=(8, 6))
-            cf = ax.tricontourf(u_pts, v_pts, energies, levels=20, cmap='plasma')
+            cf = ax.tricontourf(u_pts, v_pts, powers, levels=20, cmap='plasma')
             ax.scatter(u_pts, v_pts, c='k', s=8, alpha=0.4)          # beam centers
             ax.plot(u_pts[peak], v_pts[peak], 'ro', markersize=10)
             ax.annotate(
@@ -250,7 +281,7 @@ def receive_mode():
                 bbox=dict(boxstyle="round,pad=0.2", fc="black", alpha=0.5),
                 zorder=100
             )
-            plt.colorbar(cf, ax=ax, label='Received energy (normalized)')
+            plt.colorbar(cf, ax=ax, label='Received tone power (normalized)')
             ax.set_xlabel('u = sin(θ)cos(φ)')
             ax.set_ylabel('v = sin(θ)sin(φ)')
             ax.set_aspect('equal', adjustable='box')

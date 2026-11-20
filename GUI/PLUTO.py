@@ -4,29 +4,55 @@ PLUTO.py
 Interface layer for PLUTO SDR: connection and setup, TX tone generation, 
 RX gain control, and receive power
 
+Power measurements
+------------------
+Two kinds of power are available, and they are not interchangeable:
+
+  TONE power  (get_dBFS)
+      Power of the transmitted DDS tone only, measured at BASE_BAND with a
+      Hann-windowed single-bin DFT:
+          A     = sum(s * w * exp(-j*2*pi*BASE_BAND/SAMP_RATE * n)) / sum(w)
+          power = |A|^2
+      The window and reference are precomputed in config.py (TONE_WREF, TONE_WSUM).
+      Noise, LO leakage, spurs, and interference outside the tone's DFT bin are
+      rejected, so this is the right measurement for a stationary scatterer or an
+      array scan where the received signal sits at the transmitted frequency.
+      Note it measures the coherent sum of everything arriving at BASE_BAND
+      (direct coupling + clutter + scatterer), not the scattered field alone.
+
+  TOTAL power  (get_total_dBFS, get_energy, the self-test)
+      Mean power over the whole capture bandwidth: mean(|s|^2) = mean(I^2 + Q^2).
+      Includes noise and anything else the ADC sees. Use it to check ADC
+      loading and clipping, and for the AGC self-test (the AGC regulates total
+      level, so its -12 dBFS target only makes sense against total power).
+      get_energy() still uses total power.
+
 dBFS convention
 ---------------
-Power is mean(|s|^2) = mean(I^2 + Q^2) over complex samples, and
     dBFS = 10 * log10(power / FULL_SCALE^2)
 FULL_SCALE is the ADC amplitude (2**11 for the Pluto's 12-bit signed samples),
 not the power, because it is squared here. A full-scale complex sample (I and Q
 both at +/-FULL_SCALE) reads +3 dBFS under this definition, since I^2 + Q^2 = 2 * FS^2.
+For a clean tone at BASE_BAND, tone power and total power agree, so this
+convention is the same for both. Tone dBFS is always <= total dBFS; a large gap
+means noise, interference, or clipping is contributing to the total.
 
 Self-test (python pluto_sdr.py)
 -------------------------------
 Enables AGC (slow_attack), transmits the DDS tone, waits for the loop to settle,
-then logs N_BUFFERS RX buffers. Prints the mean/std dBFS, offset from the -12 dBFS
-AGC target, AGC-selected RX gain, and peak sample value (to detect clipping), then
-plots dBFS and RX gain versus buffer index. TX is muted and RX gain restored to
-manual on exit.
+then logs N_BUFFERS RX buffers. Prints the mean/std dBFS (total power), offset from
+the -12 dBFS AGC target, AGC-selected RX gain, and peak sample value (to detect
+clipping), then plots dBFS and RX gain versus buffer index. TX is muted and RX gain
+restored to manual on exit.
 
 Author: Kobe Prior
-Date Last Modified October 21 2026
+Last Modified: November 19 2026
 '''
 import time
 import adi
 import numpy as np
-from config import FREQ, BASE_BAND, SAMP_RATE, BUFFER_SIZE, NUM_AVG, RX_GAIN, TX_GAIN, FULL_SCALE
+from config import (FREQ, BASE_BAND, SAMP_RATE, BUFFER_SIZE, RX_GAIN,
+                    TX_GAIN, FULL_SCALE, TONE_WREF, TONE_WSUM)
 
 TX_ACTIVE = False
 sdr = None
@@ -105,29 +131,37 @@ def power_to_dBFS(power: float) -> float:
     return 10 * np.log10(power / FULL_SCALE**2 + 1e-20)
 
 
+def tone_power(s: np.ndarray) -> float:
+    '''
+    Power of the tone at BASE_BAND in one rx buffer (windowed single-bin DFT).
+    Same units as mean(|s|^2); equals it for a pure tone at BASE_BAND.
+    '''
+    A = np.dot(s, TONE_WREF) / TONE_WSUM
+    return float(np.abs(A) ** 2)
+
+def get_tone_energy(n_avg: int = 1) -> float:
+    return float(np.mean([tone_power(sdr.rx()) for _ in range(n_avg)]))
+
 def get_dBFS():
     '''
-    Mean power of the rx buffer (mean of I^2 + Q^2) relative to full scale
+    Tone power at BASE_BAND of one rx buffer, relative to full scale.
+    Rejects noise and out-of-bin signals; see "Power measurements" in the header.
     '''
     s = sdr.rx()
-    power = np.mean(np.abs(s)**2)
-    return power_to_dBFS(power)
+    return power_to_dBFS(tone_power(s))
+
+
+def get_total_dBFS():
+    '''
+    Total power of one rx buffer (mean of I^2 + Q^2) relative to full scale.
+    Use for ADC loading / AGC checks, not for tone measurements.
+    '''
+    s = sdr.rx()
+    return power_to_dBFS(np.mean(np.abs(s)**2))
 
 
 def get_energy() -> float:
-    """
-    Get tone strength proportional to amplitude of dominant frequency component
-    """
-    power = 0.0
-    for _ in range(NUM_AVG):
-        rx = sdr.rx()
-        power += np.mean(np.abs(rx)**2)
-    power /= NUM_AVG
-    return power
-
-
-def get_energy_fast() -> float:
-    "For receive mode: get energy without averaging"
+    "For receive mode: get energy without averaging (total power)"
     rx = sdr.rx()
     return float(np.mean(np.abs(rx)**2))
 
@@ -144,7 +178,7 @@ def moving_average(x, window=8):
     return np.convolve(x, np.ones(window) / window, mode='valid')
 
 
-# --- Test notion of dBFS: with AGC on we should see about -12 dBFS ---
+# --- Test notion of dBFS: with AGC on we should see about -12 dBFS (total power) ---
 if __name__ == "__main__":
     import matplotlib.pyplot as plt
 
@@ -168,7 +202,7 @@ if __name__ == "__main__":
         levels, gains, peaks = [], [], []
         for _ in range(N_BUFFERS):
             s = sdr.rx()
-            levels.append(power_to_dBFS(np.mean(np.abs(s) ** 2)))
+            levels.append(power_to_dBFS(np.mean(np.abs(s) ** 2)))  # total power: the AGC regulates this
             peaks.append(max(np.max(np.abs(s.real)), np.max(np.abs(s.imag))))
             gains.append(sdr.rx_hardwaregain_chan0)  # gain chosen by the AGC
 

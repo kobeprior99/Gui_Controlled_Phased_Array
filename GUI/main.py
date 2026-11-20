@@ -8,10 +8,10 @@ import signal
 import atexit
 import serial.tools.list_ports
 from nicegui import ui, app,background_tasks
-
 import state
 import helpers
 from PLUTO import stop_tx  # Import stop_tx from your SDR module
+from create_default_rx_grid import ensure_default_rx_lut
 
 # Import all routers from the pages module
 from pages import (
@@ -102,10 +102,17 @@ def main_page():
                     .classes(classes_style) \
                     .on('click', lambda t=target: navigate_if_ready(t))
     
-    def navigate_if_ready(target):
+    async def navigate_if_ready(target):
         if state.SELECTED_COM_PORT == 'SELECT MCU PORT':
             ui.notify("Please Select MCU Port before proceeding.", color='red')
             return
+        if target == '/beam':
+            try:
+                _,ok - await asyncio.to_thread(ensure_default_rx_lut)
+            except Exception:
+                ok = False
+            if not ok:
+                ui.notify("MCU did not confirm the receive-scan table; scan will retry", color ='orange')
         ui.navigate.to(target)
 
 # Execute the NiceGUI app

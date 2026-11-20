@@ -55,16 +55,22 @@ PHI_LIST   = np.degrees(np.arctan2(v_pts, u_pts)) % 360
 
 #PLUTO config
 BASE_BAND = 100e3
-SAMP_RATE = 5e6  # Hz e.g. 5 MHz
-TX_GAIN = -7 # -7 is -7dBm measured with spectrum analyzer and about 10 dBm with the inline amplifier.RX_GAIN = 5 # adjust as needed 0-74 be careful you don't wanna blow out frent end
+SAMP_RATE = int(5e6)  # Hz e.g. 5 MHz
+TX_GAIN = -7 # -7 is -7dBm measured with spectrum analyzer and about 10 dBm with the inline amplifier.
 RX_GAIN = 20  
+
 
 #used for dBFS reading
 FULL_SCALE = 2**11
 
 #2 ms to fill buffer
 BUFFER_SIZE = 4*2048 
-NUM_AVG = 1
+# Tone-detection reference: windowed single-bin DFT at BASE_BAND
+_n = np.arange(BUFFER_SIZE)
+_w = np.hanning(BUFFER_SIZE)
+TONE_WREF = _w * np.exp(-2j * np.pi * BASE_BAND / SAMP_RATE * _n)
+TONE_WSUM = float(np.sum(_w))
+del _n, _w
 SETTLE_TIME = 1 #time to transmit before capturing burst
 
 

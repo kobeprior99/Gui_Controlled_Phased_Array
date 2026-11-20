@@ -1,6 +1,7 @@
 from config import THETA_LIST, PHI_LIST, NSIDE, DX, DY, DX_CP, DY_CP
 import numpy as np
 import state
+import helpers
 
 def create_default_rx_search_grid(dx: float, dy: float) -> np.ndarray:
     '''
@@ -37,3 +38,9 @@ def get_default_rx_grid(cp: bool | None = None)->np.ndarray:
     if cp is None:
         cp = state.CP_ARRAY
     return DEFAULT_RX_GRID_CP if cp else DEFAULT_RX_GRID
+
+def ensure_default_rx_lut(cp: bool | None = None) -> tuple[np.ndarray, bool]:
+    '''Make sure the MCU table matches the selected default grid.'''
+    grid = get_default_rx_grid(cp)
+    include_cp = state.CP_ARRAY if cp is None else cp
+    return grid, helpers.ensure_lut(grid, include_cp=include_cp)
