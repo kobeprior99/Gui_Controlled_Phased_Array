@@ -4,7 +4,7 @@ Author: Kobe Prior
 Last Modified: Nov 18, 2026 
 Description:
 
-This module is used to find the progressive phase shifted to apply to achieve
+This module is used to find the progressive phase shifts to apply to achieve
 beam steering in a target direction theta_0 and phi_0
 
 It then computes the appropriate phase list to be send to phase shifting network

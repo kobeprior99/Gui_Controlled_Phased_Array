@@ -1,6 +1,6 @@
 '''
 Purpose: Global variables shared cross graphical user interface to keep track of 
-phase correction com port selection etc
+phase correction com port selection and lookuptable status
 '''
 import numpy as np
 

@@ -18,15 +18,15 @@ from pages import (
     calibrate_router,
     manual_router,
     beam_router,
-    scattering_router,
     scattering_router2
 )
+#scattering_router disabled
 
 # Attach/Include routers
 app.include_router(calibrate_router)
 app.include_router(manual_router)
 app.include_router(beam_router)
-app.include_router(scattering_router)
+#app.include_router(scattering_router)
 app.include_router(scattering_router2)
 
 # --- Shutdown & Clean-Up Handlers ---
@@ -57,28 +57,45 @@ def main_page():
     ports = serial.tools.list_ports.comports()
     portsList = {p.device: f'{p.device} - {p.description}' for p in ports} 
 
-    com_input = ui.select(
-        options=portsList, 
-        label=state.SELECTED_COM_PORT,
-        on_change=lambda e: background_tasks.create(helpers.set_com_port(e.value))
-    ).style('width: 300px')
+    # com_input = ui.select(
+    #     options=portsList, 
+    #     label=state.SELECTED_COM_PORT,
+    #     on_change=lambda e: background_tasks.create(helpers.set_com_port(e.value))
+    # ).style('width: 300px')
 
     images = [
         ('/calibrate', 'Calibration.png'),
         ('/manual', 'Manual_Phase_Control.png'), 
         ('/beam', 'Beam_Control.png'),
-        ('/scattering', 'Scattering_Experiment.png'),
+        # ('/scattering', 'Scattering_Experiment.png'),
         ('/scattering2', 'Scattering_Experiment2.jpeg')
     ]
 
     with ui.column().classes('w-full items-center'):
-        ui.label('Antenna Array Control').classes('text-3xl font-bold mb-4')
-        # Selects linear Tx array vs circularly polarized array (adds CP_PHASES, uses DX_CP/DY_CP)
-        ui.toggle(
-            {'linear': 'Linear Array', 'circular': 'Circularly Polarized Array'},
-            value='circular' if state.CP_ARRAY else 'linear',
-            on_change=lambda e: setattr(state, 'CP_ARRAY', e.value == 'circular')
-        ).classes('mb-8')
+        ui.image('media/arcLogo_header.png') \
+            .classes('w-full cursor-pointer hover:opacity-80 transition-opacity') \
+            .on('click', lambda: ui.run_javascript(
+                "window.open('https://arc.elsherbeni.com/', '_blank')"
+            ))
+        ui.label("Low-Cost Software-Defined Phased Array Controller") \
+                .classes('text-3xl font-bold mb-4')
+        ui.label("Developed by Kobe Prior") \
+            .classes('text-lg text-gray-500 mb-4')
+        #MCU port selection and array config
+        with ui.row().classes('items-center justify-center gap-6 mb-8'):
+            ui.select(
+                options=portsList,
+                label=state.SELECTED_COM_PORT,
+                on_change=lambda e: background_tasks.create(
+                    helpers.set_com_port(e.value)
+                )
+            ).style('width: 300px')
+
+            ui.toggle(
+                {'linear': 'Linear Array', 'circular': 'Circularly Polarized Array'},
+                value='circular' if state.CP_ARRAY else 'linear',
+                on_change=lambda e: setattr(state, 'CP_ARRAY', e.value == 'circular')
+            )
     
     ui.add_head_html('''
         <style>
@@ -114,6 +131,14 @@ def main_page():
             if not ok:
                 ui.notify("MCU did not confirm the receive-scan table; scan will retry", color ='orange')
         ui.navigate.to(target)
-
+    # --- Footer ---
+    with ui.footer().classes('bg-gray-100 text-gray-600 py-3 px-6 border-t border-gray-200 justify-center items-center gap-6'):
+        ui.label('© 2026 Kobe Prior').classes('text-sm')
+        ui.label('|').classes('text-gray-300')
+        ui.link('Website', 'https://kobeprior.com', new_tab=True) \
+            .classes('text-sm text-blue-600 hover:underline no-underline')
+        ui.label('|').classes('text-gray-300')
+        ui.link('LinkedIn', 'https://www.linkedin.com/in/kobeprior/', new_tab=True) \
+            .classes('text-sm text-blue-600 hover:underline no-underline')
 # Execute the NiceGUI app
 ui.run(title="Phase Network Control Dashboard", reload=False)
