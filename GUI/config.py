@@ -1,21 +1,31 @@
+"""
+Filename: config.py
+Author: Kobe Prior
+Date Last Modified: November 20 2026 
+Description: Holds important constants that are used across the program
+"""
+
 import numpy as np
-#contains constants used throughout the program
+
 BAUDRATE = 115200 
+
+#PHYSICAL CONSTANTS
 C = 299792458 #m/s 
 FREQ = int(2.1e9)
 LAMBDA = C/FREQ
+
+#LINEAR POLARIZED ARRAY PARAMETERS
 NUM_ELEMENTS = 16
 NSIDE = 4
-
-#RX grid Reference Coordinate System on Beam Steering page
-#spacing in meters
+#element spacing in meters
 dx_m = 57.5e-3
 dy_m = 50.0e-3
 
-##dx dy in wavelengths is:
+#dx dy in wavelengths is:
 DX = dx_m/LAMBDA 
 DY = dy_m/LAMBDA
 
+#CP ARRAY PARAMETERS
 CP_PHASES = np.array([
         270.0, 0.0, 270.0, 90.0,
         180.0, 90.0, 180.0, 0.0,
@@ -28,8 +38,8 @@ dy_m_cp = 59.592e-3
 DX_CP = dx_m_cp/LAMBDA 
 DY_CP = dy_m_cp/LAMBDA
 
-#We're limited to the resolution of our array, the half power beam width is rather large
-HPBW_DEG = 30        # full -3 dB width you measured
+#BEAM SCANNING PARAMETERS
+HPBW_DEG = 30        # full -3 dB width measured
 SCAN_MAX_DEG = 45
 
 hpbw_u = 2 * np.sin(np.deg2rad(HPBW_DEG / 2))   # beam width in uv, ~0.52
@@ -45,13 +55,6 @@ u_pts, v_pts = U[mask], V[mask]
 THETA_LIST = np.degrees(np.arcsin(np.hypot(u_pts, v_pts)))
 PHI_LIST   = np.degrees(np.arctan2(v_pts, u_pts)) % 360
 
-# num_theta = 8
-# num_phi = 32
-# #8 values
-# THETA_RANGE = np.linspace(0,45, num_theta)
-# #32 values
-# PHI_RANGE = np.linspace(0, 360, num_phi, endpoint=False)
-# #Total of 256 locations to scan through
 
 #PLUTO config
 BASE_BAND = 100e3
@@ -59,12 +62,10 @@ SAMP_RATE = int(5e6)  # Hz e.g. 5 MHz
 TX_GAIN = -7 # -7 is -7dBm measured with spectrum analyzer and about 10 dBm with the inline amplifier.
 RX_GAIN = 20  
 
-
 #used for dBFS reading
 FULL_SCALE = 2**11
-
-#2 ms to fill buffer
 BUFFER_SIZE = 4*2048 
+
 # Tone-detection reference: windowed single-bin DFT at BASE_BAND
 _n = np.arange(BUFFER_SIZE)
 _w = np.hanning(BUFFER_SIZE)
