@@ -1,8 +1,10 @@
-# beam_tools/scan.py
 '''
-Hardware scan logic for receive mode: uploads the LUT to the MCU, turns on
+scan.py
+Description:Hardware scan logic for receive mode: uploads the LUT to the MCU, turns on
 the transmitter, steps through every array state, and returns the measured
 tone power for each one. No UI code lives here.
+Author: Kobe Prior
+Date Last Modified: Nov 24, 2026
 '''
 import asyncio
 import numpy as np

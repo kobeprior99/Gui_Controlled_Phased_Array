@@ -1,4 +1,11 @@
 #transmit.py
+'''
+transmit.py
+Description: transmit a tone and change beam scan angle to measure radiation
+Author: Kobe Prior
+Date Last Modified: Nov24, 2026
+'''
+
 import asyncio
 import time
 import plotly.graph_objects as go

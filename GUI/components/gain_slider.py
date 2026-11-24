@@ -1,3 +1,10 @@
+'''
+gain_slider.py
+Description: change transmit and receive gain
+Author: Kobe Prior
+Date Last Modified: Nov 24,2026
+'''
+
 from nicegui import ui
 from config import RX_GAIN, TX_GAIN
 from PLUTO import set_gain

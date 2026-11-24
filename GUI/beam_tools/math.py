@@ -1,8 +1,11 @@
-# beam_tools/math.py
+# beam_tools/
 '''
-Pure numpy helpers for beam scan analysis: (u, v) <-> (theta, phi)
+math.py
+Description:Pure numpy helpers for beam scan analysis: (u, v) <-> (theta, phi)
 conversions and sinc interpolation of the sampled power surface.
 No UI or SDR imports.
+Author:Kobe Prior
+Date Last Modified: Nov 24,2026
 '''
 import numpy as np
 from config import UV_STEP, r_max

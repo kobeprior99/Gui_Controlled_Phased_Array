@@ -1,3 +1,9 @@
+'''
+plots.py
+Description: Helps plot beam figures for beam steering page in receive and transmit mode
+Author: Kobe Prior
+Date: Nov 24, 2026
+'''
 import numpy as np
 from matplotlib.figure import Figure
 from .math import sinc_surface

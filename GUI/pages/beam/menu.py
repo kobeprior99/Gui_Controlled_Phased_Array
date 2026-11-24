@@ -1,4 +1,9 @@
-# pages/beam/menu.py
+'''
+menu.py
+Description: chose from trnasmit and receive mode
+Author: Kobe Prior
+Date Last Modified: Nov24, 2026
+'''
 import helpers
 from nicegui import ui
 from ._router import router

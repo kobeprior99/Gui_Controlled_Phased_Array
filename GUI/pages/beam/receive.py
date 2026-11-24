@@ -1,4 +1,9 @@
-#receive.py
+'''
+receive.py
+Description: scan through known angles and produce AoA
+Author: Kobe Prior
+Date Last Modified: Nov24, 2026
+'''
 import asyncio
 import numpy as np
 from nicegui import ui
