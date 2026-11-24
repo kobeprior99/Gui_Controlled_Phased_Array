@@ -1,142 +1,16 @@
 '''
-Purpose: this is the entry point into the graphical user interface that host pages shown @pages
-Author: Kobe Prior
-Last Modified: September 7, 2026
+main.py
+Description:Entry point into gui 
+Last Modified: Nov 24, 2026
 '''
-import asyncio
-import signal
-import atexit
-import serial.tools.list_ports
-from nicegui import ui, app,background_tasks
-import state
-import helpers
-from PLUTO import stop_tx  # Import stop_tx from your SDR module
-from create_default_rx_grid import ensure_default_rx_lut
+from nicegui import ui, app
+from pages import home_router,calibrate_router, manual_router, beam_router, scattering_router2
+import lifecycle
 
-# Import all routers from the pages module
-from pages import (
-    calibrate_router,
-    manual_router,
-    beam_router,
-    scattering_router2
-)
-#scattering_router disabled
+for r in (home_router, calibrate_router, manual_router, beam_router, scattering_router2):
+    app.include_router(r)
 
-# Attach/Include routers
-app.include_router(calibrate_router)
-app.include_router(manual_router)
-app.include_router(beam_router)
-app.include_router(scattering_router2)
+lifecycle.register(app)
 
-# --- Shutdown & Clean-Up Handlers ---
-def cleanup():
-    """Safety function to disable transmitter upon exit."""
-    try:
-        stop_tx()
-        print("\n[INFO] Transmitter successfully disabled.")
-    except Exception as e:
-        print(f"\n[ERROR] Failed to stop transmitter during shutdown: {e}")
-
-# 1. Hook into NiceGUI's app shutdown event
-app.on_shutdown(cleanup)
-
-# 2. Register Python process exit handlers (atexit & OS signals)
-atexit.register(cleanup)
-
-def signal_handler(sig, frame):
-    cleanup()
-    exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)   # Handles Ctrl+C
-signal.signal(signal.SIGTERM, signal_handler)  # Handles terminate requests
-
-# --- GUI Layout ---
-@ui.page('/')
-def main_page():
-    ports = serial.tools.list_ports.comports()
-    portsList = {p.device: f'{p.device} - {p.description}' for p in ports} 
-
-    # com_input = ui.select(
-    #     options=portsList, 
-    #     label=state.SELECTED_COM_PORT,
-    #     on_change=lambda e: background_tasks.create(helpers.set_com_port(e.value))
-    # ).style('width: 300px')
-
-    images = [
-        ('/calibrate', 'Calibration.png'),
-        ('/manual', 'Manual_Phase_Control.png'), 
-        ('/beam', 'Beam_Control.png'),
-        ('/scattering2', 'Scattering_Experiment2.jpeg')
-    ]
-
-    with ui.column().classes('w-full items-center'):
-        ui.image('media/arcLogo_header.png') \
-            .classes('w-full cursor-pointer hover:opacity-80 transition-opacity') \
-            .on('click', lambda: ui.run_javascript(
-                "window.open('https://arc.elsherbeni.com/', '_blank')"
-            ))
-        ui.label("Low-Cost Software-Defined Phased Array Controller") \
-                .classes('text-3xl font-bold mb-4')
-        ui.label("Developed by Kobe Prior") \
-            .classes('text-lg text-gray-500 mb-4')
-        #MCU port selection and array config
-        with ui.row().classes('items-center justify-center gap-6 mb-8'):
-            ui.select(
-                options=portsList,
-                label=state.SELECTED_COM_PORT,
-                on_change=lambda e: background_tasks.create(
-                    helpers.set_com_port(e.value)
-                )
-            ).style('width: 300px')
-
-            ui.toggle(
-                {'linear': 'Linear Array', 'circular': 'Circularly Polarized Array'},
-                value='circular' if state.CP_ARRAY else 'linear',
-                on_change=lambda e: setattr(state, 'CP_ARRAY', e.value == 'circular')
-            )
-    
-    ui.add_head_html('''
-        <style>
-            @keyframes blink {
-              0%, 100% { opacity: 1; }
-              50% { opacity: 0.4; }
-            }
-            .blink { animation: blink 1.2s ease-in-out infinite; }
-        </style>
-    ''')
-
-    with ui.row().classes('w-full justify-center items-center gap-4'):
-        for target, filename in images:
-            classes_style = 'w-1/5 cursor-pointer hover:scale-105 transition-transform duration-200' 
-            if target == images[0][0] and not state.PHASE_CORRECTED: 
-                ui.image(f'media/{filename}')\
-                    .classes(f'{classes_style} blink') \
-                    .on('click', lambda t=target: navigate_if_ready(t))
-            else:
-                ui.image(f'media/{filename}')\
-                    .classes(classes_style) \
-                    .on('click', lambda t=target: navigate_if_ready(t))
-    
-    async def navigate_if_ready(target):
-        if state.SELECTED_COM_PORT == 'SELECT MCU PORT':
-            ui.notify("Please Select MCU Port before proceeding.", color='red')
-            return
-        if target == '/beam':
-            try:
-                _,ok - await asyncio.to_thread(ensure_default_rx_lut)
-            except Exception:
-                ok = False
-            if not ok:
-                ui.notify("MCU did not confirm the receive-scan table; scan will retry", color ='orange')
-        ui.navigate.to(target)
-    # --- Footer ---
-    with ui.footer().classes('bg-gray-100 text-gray-600 py-3 px-6 border-t border-gray-200 justify-center items-center gap-6'):
-        ui.label('© 2026 Kobe Prior').classes('text-sm')
-        ui.label('|').classes('text-gray-300')
-        ui.link('Website', 'https://kobeprior.com', new_tab=True) \
-            .classes('text-sm text-blue-600 hover:underline no-underline')
-        ui.label('|').classes('text-gray-300')
-        ui.link('LinkedIn', 'https://www.linkedin.com/in/kobeprior/', new_tab=True) \
-            .classes('text-sm text-blue-600 hover:underline no-underline')
-# Execute the NiceGUI app
-ui.run(title="Phase Network Control Dashboard", reload=False)
+if __name__ in {"__main__", "__mp_main__"}:
+    ui.run(title="Phase Network Control Dashboard", reload=False)

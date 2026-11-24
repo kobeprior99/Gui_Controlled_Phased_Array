@@ -1,3 +1,12 @@
+'''
+create_default_rx_grid.py
+Description:
+    This program is used to create a search grid for coarse AoA estimation.
+    It also loads a lookup table onto the microcontroller
+Author: Kobe Prior
+Last Modified: November 24, 2026
+
+'''
 from config import THETA_LIST, PHI_LIST, NSIDE, DX, DY, DX_CP, DY_CP
 import numpy as np
 import state

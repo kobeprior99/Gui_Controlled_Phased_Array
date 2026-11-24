@@ -1,5 +1,6 @@
 '''
-Purpose: Contains helper functions for main.py
+Purpose: Contains helper functions to interface with the microcontroller, 
+and the graphical user interface
 Author: Kobe Prior
 Last Modified: July 17, 2026
 '''

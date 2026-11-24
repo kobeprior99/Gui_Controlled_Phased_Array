@@ -1,6 +1,6 @@
 '''
 Purpose: Solve for the element phases that generate an OAM mode of topological
-charge l on the square array, instead of hard-coding them in config.py.
+charge l on the square array, instead of hard-coding them.
 
 Each element is fed the phase  l * phi_n  where phi_n is the azimuthal angle of
 element n measured about the array center.

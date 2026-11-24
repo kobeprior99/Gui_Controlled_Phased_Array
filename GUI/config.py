@@ -8,7 +8,6 @@ Description: Holds important constants that are used across the program
 import numpy as np
 
 BAUDRATE = 115200 
-
 #PHYSICAL CONSTANTS
 C = 299792458 #m/s 
 FREQ = int(2.1e9)
@@ -82,4 +81,11 @@ S2PDIR = 'S2P-SEP9-2026'
 SETTLE_TIME_S = 3
 N_DISCARD_BUFFERS = 100
 N_AVG_BUFFERS = 30
+#GUI
+NAV_ITEMS = [
+    ('/calibrate',   'Calibration.png'),
+    ('/manual',      'Manual_Phase_Control.png'),
+    ('/beam',        'Beam_Control.png'),
+    ('/scattering2', 'Scattering_Experiment2.jpeg'),
+]
 

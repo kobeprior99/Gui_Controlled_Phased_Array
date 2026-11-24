@@ -1,3 +1,5 @@
+#pages/__init__.py
+from .home import router as home_router
 from .calibrate import router as calibrate_router
 from .manual import router as manual_router
 from .beam import router as beam_router
