@@ -72,6 +72,5 @@ Once the virtual environment is active and all requirements are installed, launc
 ```bash
 python main.py
 ```
-*(Note: Replace `main.py` with the actual filename of your entry script if named differently, e.g., `gui.py`)*
 
 After launching, your default web browser should automatically open to `http://localhost:8080` (or the port specified by NiceGUI) displaying the control interface.
