@@ -114,6 +114,11 @@ def scattering2():
                 img.classes('pointer-events-none opacity-50')
             else:
                 img.classes(remove='pointer-events-none opacity-50')
+        # Table has no disable(); lock it via CSS instead
+        if is_busy:
+            matrix_table.classes('pointer-events-none opacity-50')
+        else:
+            matrix_table.classes(remove='pointer-events-none opacity-50')
 
     def guard_busy() -> bool:
         if busy['value']:
@@ -276,7 +281,6 @@ def scattering2():
         rows=build_table_rows(),
         row_key='id',
     ).classes('w-full max-w-5xl mx-auto mt-2')
-    lockable_elements.append(matrix_table)
 
     # Forward-declared UI updaters for active cell & noise guide
     active_cell_badge = ui.label('').classes('text-base font-bold text-blue-700')
